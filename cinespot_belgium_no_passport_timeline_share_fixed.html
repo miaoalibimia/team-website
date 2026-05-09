@@ -1,0 +1,4132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CINESPOT BELGIUM</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+  <!-- FontAwesome for movie icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Fonts: Playfair Display (cinematic serif) + Inter (clean sans) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <!-- GSAP for neon trace animations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <!-- GIF export for share cards -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+
+  <style>
+    /* ======= DESIGN SYSTEM ======= */
+    :root {
+      --bg-primary: #0D0D0D;
+      --bg-secondary: #121212;
+      --bg-panel: #111111;
+      --bg-card: #1A1A1A;
+      --bg-hover: #222222;
+      --amber: #C8902A;
+      --amber-dim: #9A6E1F;
+      --amber-glow: rgba(200, 144, 42, 0.3);
+      --amber-bright: #E4A832;
+      --text-primary: #F0EDE8;
+      --text-secondary: #888075;
+      --text-muted: #5A5550;
+      --border: #2A2A2A;
+      --serif: 'Playfair Display', Georgia, serif;
+      --sans: 'Inter', -apple-system, sans-serif;
+      --panel-width: 400px;
+      --nav-height: 64px;
+      --transition: 300ms ease-out;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--sans);
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+
+    /* ======= TOP NAV ======= */
+    #topNav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: var(--nav-height);
+      background: rgba(13, 13, 13, 0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      z-index: 1000;
+    }
+
+    .logo-lockup { display: flex; flex-direction: column; cursor: default; flex-shrink: 0; }
+    .logo-title { font-family: var(--serif); font-size: 22px; letter-spacing: 3px; color: var(--text-primary); line-height: 1.1; font-weight: 700; }
+    .logo-subtitle { font-family: var(--sans); font-size: 9px; letter-spacing: 5px; text-transform: uppercase; color: var(--text-secondary); line-height: 1; margin-top: 2px; }
+
+    /* Search */
+    .search-container { position: relative; width: 380px; flex-shrink: 0; }
+    .search-bar {
+      width: 100%; height: 40px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0 16px 0 40px;
+      font-family: var(--sans); font-size: 13px;
+      color: var(--text-primary); outline: none;
+      transition: border-color var(--transition);
+    }
+    .search-bar::placeholder { color: var(--text-muted); }
+    .search-bar:focus { border-color: var(--amber-dim); }
+    .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px; }
+
+    .search-dropdown {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+      background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px;
+      max-height: 300px; overflow-y: auto; display: none; z-index: 1010;
+    }
+    .search-dropdown.active { display: block; }
+    .search-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; cursor: pointer; transition: background var(--transition); }
+    .search-item:hover { background: var(--bg-hover); }
+    .search-item-type { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: var(--amber); font-family: var(--sans); font-weight: 500; min-width: 64px; }
+    .search-item-label { font-size: 14px; color: var(--text-primary); }
+
+    /* Filter chips */
+    .filter-chips { display: flex; gap: 8px; margin-top: 8px; position: absolute; top: calc(100% + 4px); left: 0; }
+    .filter-chip {
+      padding: 4px 12px; border: 1px solid var(--border); border-radius: 3px;
+      font-size: 11px; font-family: var(--sans); letter-spacing: 1px;
+      text-transform: uppercase; color: var(--text-secondary); background: transparent;
+      cursor: pointer; transition: all var(--transition);
+    }
+    .filter-chip:hover { border-color: var(--amber-dim); color: var(--text-primary); }
+    .filter-chip.active { border-color: var(--amber); color: var(--amber); background: rgba(200, 144, 42, 0.08); }
+
+    /* Tab Navigation */
+    .tab-nav { display: flex; gap: 32px; flex-shrink: 0; }
+    .tab-btn {
+      background: none; border: none; font-family: var(--sans);
+      font-size: 13px; font-weight: 400; letter-spacing: 1px;
+      color: var(--text-secondary); cursor: pointer; padding: 8px 0;
+      position: relative; transition: color var(--transition);
+    }
+    .tab-btn:hover { color: var(--text-primary); }
+    .tab-btn.active { color: var(--text-primary); }
+    .tab-btn.active::after {
+      content: ''; position: absolute; bottom: -4px; left: 0; right: 0;
+      height: 2px; background: var(--amber);
+    }
+
+    /* ======= MAP ======= */
+    #mapContainer { position: fixed; top: var(--nav-height); left: 0; right: 0; bottom: 0; z-index: 700; display: block; }
+    #map { width: 100%; height: 100%; background: #f7f7f5; }
+    #map img.leaflet-tile,
+    #map canvas.leaflet-tile,
+    #map .leaflet-tile {
+      filter: grayscale(1) contrast(1.18) brightness(1.06);
+    }
+
+    .leaflet-control-zoom { border: none !important; box-shadow: none !important; }
+    .leaflet-control-zoom a {
+      background: var(--bg-secondary) !important; color: var(--text-secondary) !important;
+      border: 1px solid var(--border) !important; width: 32px !important;
+      height: 32px !important; line-height: 32px !important; font-size: 16px !important;
+    }
+    .leaflet-control-zoom a:hover { background: var(--bg-hover) !important; color: var(--text-primary) !important; }
+    .leaflet-control-attribution { display: none !important; }
+
+    /* status bar removed */
+
+    /* ======= MAP MARKERS ======= */
+    .leaflet-marker-icon { background: none !important; border: none !important; }
+
+    .cine-marker-wrapper {
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; position: relative;
+      width: 36px; height: 36px;
+      transform: none !important;
+    }
+
+    .cine-marker-icon,
+    .cine-glow-dot {
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.2s ease, opacity 0.2s ease, filter 0.2s ease, box-shadow 0.25s ease, background 0.25s ease;
+      position: relative;
+    }
+
+    .cine-marker-icon {
+      width: 34px; height: 34px;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    .cine-marker-icon i {
+      font-size: 26px;
+      color: #111111;
+      text-shadow:
+        0 0 1px rgba(255,255,255,1),
+        0 0 2px rgba(255,255,255,0.98),
+        0 0 5px rgba(255,255,255,0.88);
+      filter:
+        drop-shadow(0 2px 6px rgba(0,0,0,0.34))
+        drop-shadow(0 0 10px rgba(255,255,255,0.24));
+      transition: transform 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+    }
+
+    .cine-marker-wrapper:hover .cine-marker-icon,
+    .cine-marker-icon.active {
+      transform: translateY(-1px) scale(1.14);
+    }
+
+    .cine-marker-wrapper:hover .cine-marker-icon i,
+    .cine-marker-icon.active i {
+      filter:
+        drop-shadow(0 4px 12px rgba(0,0,0,0.42))
+        drop-shadow(0 0 12px rgba(255,255,255,0.30));
+    }
+
+    .cine-glow-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #E7BA5A;
+      border: none;
+      box-shadow:
+        0 0 12px rgba(231, 186, 90, 0.82),
+        0 0 24px rgba(231, 186, 90, 0.56),
+        0 0 40px rgba(231, 186, 90, 0.34);
+      animation: glowMarkerPulse 2.1s ease-in-out infinite;
+    }
+
+    .cine-glow-dot.active {
+      width: 12px; height: 12px;
+      box-shadow:
+        0 0 14px rgba(231, 186, 90, 0.88),
+        0 0 28px rgba(231, 186, 90, 0.60),
+        0 0 44px rgba(231, 186, 90, 0.38);
+    }
+
+    .cine-glow-dot.just-checked-in {
+      animation:
+        checkinSpark 0.65s cubic-bezier(0.16, 1, 0.3, 1) 1,
+        glowMarkerPulse 2.1s ease-in-out infinite 0.65s;
+    }
+
+    .cine-marker-stem,
+    .cine-marker-shadow {
+      display: none !important;
+    }
+
+    @keyframes glowMarkerPulse {
+      0%, 100% {
+        box-shadow:
+          0 0 10px var(--amber-glow),
+          0 0 22px rgba(200, 144, 42, 0.34),
+          0 0 34px rgba(200, 144, 42, 0.18);
+      }
+      50% {
+        box-shadow:
+          0 0 14px var(--amber-glow),
+          0 0 28px rgba(200, 144, 42, 0.44),
+          0 0 42px rgba(200, 144, 42, 0.24);
+      }
+    }
+
+    @keyframes checkinSpark {
+      0% {
+        transform: scale(0.65);
+        opacity: 0.55;
+        box-shadow:
+          0 0 0 0 rgba(200, 144, 42, 0.00),
+          0 0 6px rgba(200, 144, 42, 0.30);
+      }
+      55% {
+        transform: scale(1.9);
+        opacity: 1;
+        box-shadow:
+          0 0 18px rgba(200, 144, 42, 0.68),
+          0 0 36px rgba(200, 144, 42, 0.34),
+          0 0 54px rgba(200, 144, 42, 0.16);
+      }
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    /* ======= RIGHT INFO PANEL ======= */
+    #rightPanel {
+      position: fixed; top: var(--nav-height); right: 0; bottom: 0;
+      width: var(--panel-width); background: var(--bg-panel);
+      border-left: 1px solid var(--border);
+      transform: translateX(100%); transition: transform var(--transition);
+      z-index: 950; overflow-y: auto; overflow-x: hidden;
+    }
+    #rightPanel.open { transform: translateX(0); }
+
+    .panel-close {
+      position: absolute; top: 16px; right: 16px;
+      width: 32px; height: 32px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border); border-radius: 3px;
+      color: var(--text-secondary); font-size: 14px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      z-index: 10; transition: all var(--transition);
+    }
+    .panel-close:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+
+    .film-poster { width: 100%; height: 260px; background: var(--bg-card); position: relative; overflow: hidden; }
+    .film-poster img { width: 100%; height: 100%; object-fit: cover; }
+    .film-poster-placeholder {
+      width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%);
+    }
+    .film-poster-placeholder span { font-family: var(--serif); font-size: 28px; color: var(--text-muted); text-align: center; padding: 40px; line-height: 1.3; }
+    .film-poster-gradient { position: absolute; bottom: 0; left: 0; right: 0; height: 80px; background: linear-gradient(transparent, var(--bg-panel)); }
+
+    .panel-body { padding: 24px 28px 40px; }
+    .film-title { font-family: var(--serif); font-size: 28px; color: var(--text-primary); line-height: 1.2; margin-bottom: 8px; font-weight: 700; }
+    .film-meta { font-family: var(--sans); font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; }
+    .film-rating { display: inline-flex; align-items: center; gap: 6px; font-family: var(--sans); font-size: 15px; font-weight: 500; color: var(--amber); margin-bottom: 16px; }
+    .film-rating-star { font-size: 16px; }
+    .film-genres { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+    .genre-tag { padding: 3px 10px; border: 1px solid var(--border); border-radius: 2px; font-size: 11px; letter-spacing: 0.5px; color: var(--text-secondary); text-transform: capitalize; }
+    .film-synopsis { font-size: 13px; line-height: 1.7; color: var(--text-secondary); margin-bottom: 20px; }
+    .imdb-link { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); text-decoration: none; transition: color var(--transition); margin-bottom: 32px; }
+    .imdb-link:hover { color: var(--amber); }
+    .imdb-link svg { width: 12px; height: 12px; }
+
+    .section-label { font-family: var(--sans); font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 16px; font-weight: 500; }
+
+    .location-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 16px; }
+    .location-card-header { padding: 14px 16px; display: flex; justify-content: space-between; align-items: flex-start; }
+    .location-name { font-family: var(--serif); font-size: 17px; color: var(--text-primary); line-height: 1.3; }
+    .location-note { font-size: 12px; line-height: 1.5; color: var(--text-secondary); margin-top: 4px; }
+    .location-nav-btn {
+      flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(200, 144, 42, 0.1); border: 1px solid var(--border);
+      color: var(--amber); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all var(--transition); position: relative;
+    }
+    .location-nav-btn:hover { background: rgba(200, 144, 42, 0.2); border-color: var(--amber-dim); }
+    .location-nav-btn .tooltip {
+      position: absolute; bottom: calc(100% + 8px); right: 0;
+      white-space: nowrap; padding: 5px 10px;
+      background: var(--bg-primary); border: 1px solid var(--border);
+      border-radius: 3px; font-size: 11px; color: var(--text-primary);
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .location-nav-btn:hover .tooltip { opacity: 1; }
+
+    .location-streetview {
+      width: 100%; height: 160px;
+      background: var(--bg-secondary);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-muted); font-size: 12px; overflow: hidden;
+    }
+    .location-streetview img { width: 100%; height: 100%; object-fit: cover; }
+
+    /* Check-in */
+    .checkin-section { margin-top: 32px; }
+    .checkin-btn {
+      width: 100%; padding: 16px;
+      background: var(--amber); border: none; border-radius: 3px;
+      font-family: var(--serif); font-size: 16px; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--bg-primary);
+      cursor: pointer; transition: all var(--transition);
+      font-weight: 600;
+    }
+    .checkin-btn:hover { background: var(--amber-bright); box-shadow: 0 4px 20px rgba(200, 144, 42, 0.3); }
+    .checkin-btn:disabled { background: var(--bg-card); color: var(--text-muted); border: 1px solid var(--border); cursor: default; }
+
+    .checkin-done { text-align: center; padding: 16px; border: 1px solid var(--amber-dim); border-radius: 3px; background: rgba(200, 144, 42, 0.05); }
+    .checkin-done-label { font-family: var(--serif); font-size: 16px; color: var(--amber); letter-spacing: 2px; }
+    .checkin-done-date { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+    .journey-link { display: block; text-align: center; margin-top: 12px; font-size: 13px; color: var(--amber); text-decoration: none; cursor: pointer; transition: opacity var(--transition); }
+    .journey-link:hover { opacity: 0.7; }
+
+    /* Photo comparison section — top/bottom stacked */
+    .photo-section { margin-top: 28px; }
+    .photo-stacked {
+      width: 100%; border-radius: 4px; overflow: hidden; margin-top: 12px;
+      border: 1px solid var(--border);
+    }
+    .photo-stack-row {
+      position: relative; width: 100%; height: 160px; overflow: hidden;
+    }
+    .photo-stack-row img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    .photo-stack-divider {
+      height: 1px; background: var(--border);
+    }
+    .photo-stack-label {
+      position: absolute; bottom: 8px; left: 8px;
+      font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+      color: #fff; background: rgba(0,0,0,0.6); padding: 3px 8px;
+      border-radius: 2px; font-family: var(--sans); pointer-events: none;
+    }
+    /* placeholder for filming location screenshot — unified white for all locations */
+    .photo-stack-placeholder {
+      width: 100%; height: 160px;
+      background: #F7F6F2;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 10px; color: #C8C4BB; position: relative; overflow: hidden;
+    }
+    .photo-stack-placeholder::before {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(0,0,0,0.04) 39px, rgba(0,0,0,0.04) 40px),
+        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(0,0,0,0.04) 39px, rgba(0,0,0,0.04) 40px);
+    }
+    .photo-stack-placeholder svg { opacity: 0.35; flex-shrink: 0; position: relative; z-index: 1; }
+    .photo-stack-placeholder-text {
+      font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+      opacity: 0.45; font-family: var(--sans); position: relative; z-index: 1; color: #A8A49E;
+    }
+
+    /* Inline upload — full-area droppable, no border */
+    .inline-upload {
+      position: relative;
+      min-height: 160px;
+      background: var(--bg-secondary);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 6px; text-align: center;
+      padding: 28px 24px;
+      cursor: pointer;
+      transition: background var(--transition);
+      overflow: hidden;
+    }
+    .inline-upload input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .inline-upload:hover { background: #1a1a1a; }
+    .inline-upload.dragover { background: rgba(200,144,42,0.06); }
+    .inline-upload-title {
+      font-family: var(--serif); font-style: italic;
+      font-size: 15px; color: var(--text-secondary);
+      line-height: 1.4; pointer-events: none;
+    }
+    .inline-upload-drag {
+      font-size: 11px; color: var(--text-muted);
+      pointer-events: none; margin-top: 2px;
+    }
+    .inline-upload-or {
+      font-size: 10px; color: var(--text-muted); opacity: 0.5;
+      letter-spacing: 1px; pointer-events: none;
+    }
+    .inline-upload-btn {
+      display: inline-block; margin-top: 4px;
+      padding: 7px 18px; background: transparent;
+      border: 1px solid var(--border); border-radius: 3px;
+      font-family: var(--sans); font-size: 10px; letter-spacing: 2.5px;
+      text-transform: uppercase; color: var(--text-secondary);
+      pointer-events: none; transition: all var(--transition);
+    }
+    .inline-upload:hover .inline-upload-btn {
+      border-color: var(--amber-dim); color: var(--text-primary);
+    }
+
+    .photo-placeholder {
+      text-align: center; padding: 32px 20px;
+      border: 1px dashed var(--border); border-radius: 4px; margin-top: 12px;
+    }
+    .photo-placeholder-text { font-family: var(--serif); font-style: italic; font-size: 15px; color: var(--text-secondary); margin-bottom: 4px; }
+    .photo-placeholder-sub { font-size: 11px; color: var(--text-muted); margin-bottom: 16px; }
+    .upload-btn {
+      padding: 10px 24px; background: transparent;
+      border: 1px solid var(--border); border-radius: 3px;
+      font-family: var(--sans); font-size: 12px; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--text-secondary);
+      cursor: pointer; transition: all var(--transition);
+    }
+    .upload-btn:hover { border-color: var(--amber-dim); color: var(--text-primary); }
+    .photo-preview { width: 100%; border-radius: 4px; overflow: hidden; margin-top: 12px; position: relative; }
+    .photo-preview img { width: 100%; display: block; }
+
+    /* Upload Modal */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 2000; opacity: 0; pointer-events: none;
+      transition: opacity var(--transition);
+    }
+    .modal-overlay.active { opacity: 1; pointer-events: auto; }
+    .modal-content { width: 480px; max-width: 90vw; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; padding: 32px; position: relative; }
+    .modal-title { font-family: var(--serif); font-size: 22px; color: var(--text-primary); margin-bottom: 24px; }
+    .modal-close { position: absolute; top: 16px; right: 16px; background: none; border: none; color: var(--text-secondary); font-size: 20px; cursor: pointer; }
+    .dropzone {
+      border: 2px dashed var(--border); border-radius: 4px; padding: 48px 24px;
+      text-align: center; cursor: pointer; transition: all var(--transition);
+    }
+    .dropzone:hover, .dropzone.dragover { border-color: var(--amber-dim); background: rgba(200, 144, 42, 0.03); }
+    .dropzone-text { font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; }
+    .dropzone-btn {
+      display: inline-block; padding: 8px 20px;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 3px;
+      font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+      color: var(--text-secondary); cursor: pointer;
+    }
+
+    /* Stamp Overlay */
+    .stamp-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.92);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 3000; opacity: 0; pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+    .stamp-overlay.active { opacity: 1; pointer-events: auto; }
+    .stamp-frame { position: relative; width: 300px; height: 300px; display: flex; align-items: center; justify-content: center; }
+    .stamp-circle {
+      width: 220px; height: 220px;
+      border: 3px solid var(--amber); border-radius: 50%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transform: scale(3) rotate(-15deg); opacity: 0;
+      transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .stamp-overlay.active .stamp-circle { transform: scale(1) rotate(-8deg); opacity: 1; }
+    .stamp-circle-inner {
+      width: 200px; height: 200px;
+      border: 1.5px solid var(--amber); border-radius: 50%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 20px; text-align: center;
+    }
+    .stamp-text-top { font-family: var(--serif); font-size: 11px; letter-spacing: 4px; text-transform: uppercase; color: var(--amber); }
+    .stamp-location { font-family: var(--serif); font-size: 20px; color: var(--amber); margin: 8px 0; line-height: 1.2; }
+    .stamp-text-bottom { font-family: var(--sans); font-size: 10px; letter-spacing: 2px; color: var(--amber-dim); }
+    .stamp-checkmark { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--amber); margin-top: 8px; font-family: var(--sans); font-weight: 500; }
+    .stamp-cta { margin-top: 40px; opacity: 0; transform: translateY(10px); transition: all 0.4s ease 0.6s; }
+    .stamp-overlay.active .stamp-cta { opacity: 1; transform: translateY(0); }
+    .stamp-cta-btn {
+      padding: 12px 32px; background: transparent;
+      border: 1px solid var(--amber-dim); border-radius: 3px;
+      font-family: var(--sans); font-size: 13px; letter-spacing: 1px;
+      color: var(--amber); cursor: pointer; transition: all var(--transition);
+    }
+    .stamp-cta-btn:hover { background: rgba(200, 144, 42, 0.1); }
+    .stamp-filmstrip { position: absolute; top: 0; left: 50%; transform: translateX(-50%); display: flex; gap: 16px; }
+    .stamp-filmstrip-bottom { top: auto; bottom: 0; }
+    .stamp-sprocket { width: 8px; height: 8px; border-radius: 1px; background: var(--amber-dim); opacity: 0.3; }
+
+    /* ======= MY JOURNEY (TAB 2) ======= */
+    #journeyView {
+      position: fixed; top: var(--nav-height); left: 0; right: 0; bottom: 0;
+      z-index: 800; display: none;
+      background: #0A0A0B;
+      overflow: hidden;
+      --journey-timeline-space: 205px;
+    }
+    #journeyView.active { display: block; }
+    #journeyView:not(.active), #aboutView:not(.active) { pointer-events: none; }
+
+    .journey-canvas-area {
+      position: absolute;
+      inset: 0 0 var(--journey-timeline-space) 0;
+    }
+    #journeyCanvas {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+    }
+
+    /* Passport toggle */
+    .passport-toggle {
+      position: absolute; top: 24px; left: 24px; z-index: 860;
+      width: 42px; height: 42px; border-radius: 50%;
+      background: rgba(10,10,11,0.5);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(200,144,42,0.15);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.35s cubic-bezier(0.16,1,0.3,1);
+    }
+    .passport-toggle svg {
+      width: 18px; height: 18px;
+      stroke: rgba(200,144,42,0.7); fill: none;
+      stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round;
+      transition: all 0.3s ease;
+    }
+    .passport-toggle:hover {
+      transform: scale(1.08);
+      border-color: rgba(200,144,42,0.35);
+    }
+    .passport-toggle:hover svg { stroke: var(--amber); }
+    .passport-toggle.open { background: rgba(200,144,42,0.08); border-color: rgba(200,144,42,0.3); }
+
+    /* Passport sidebar */
+    .passport-sidebar {
+      position: absolute; top: 0; left: 0; bottom: 0;
+      width: 360px; z-index: 850;
+      background: rgba(10,10,14,0.78);
+      backdrop-filter: blur(40px) saturate(1.3);
+      -webkit-backdrop-filter: blur(40px) saturate(1.3);
+      border-right: 1px solid rgba(200,144,42,0.08);
+      transform: translateX(-100%);
+      transition: transform 0.5s cubic-bezier(0.16,1,0.3,1);
+      overflow-y: auto; overflow-x: hidden;
+      padding: 80px 32px 40px;
+    }
+    .passport-sidebar.open { transform: translateX(0); }
+
+    .passport-header { margin-bottom: 40px; }
+    .passport-title {
+      font-family: var(--serif); font-size: 13px; font-weight: 400;
+      letter-spacing: 6px; text-transform: uppercase;
+      color: rgba(200,144,42,0.6); margin-bottom: 0;
+    }
+
+    /* Timeline */
+    .passport-timeline { position: relative; padding-left: 20px; }
+    .passport-timeline::before {
+      content: ''; position: absolute;
+      left: 3px; top: 6px; bottom: 6px;
+      width: 0.5px;
+      background: linear-gradient(to bottom, rgba(200,144,42,0.3), rgba(200,144,42,0.05));
+    }
+
+    .passport-entry {
+      position: relative;
+      padding-bottom: 36px;
+      opacity: 0; transform: translateX(-8px);
+    }
+    .passport-entry.visible {
+      opacity: 1; transform: translateX(0);
+      transition: all 0.6s cubic-bezier(0.16,1,0.3,1);
+    }
+    .passport-entry::before {
+      content: ''; position: absolute; left: -20px; top: 5px;
+      width: 7px; height: 7px; border-radius: 50%;
+      background: transparent;
+      border: 1.5px solid rgba(200,144,42,0.5);
+      z-index: 1;
+    }
+
+    .passport-entry-date {
+      font-family: var(--sans); font-size: 8px;
+      letter-spacing: 3px; text-transform: uppercase;
+      color: rgba(200,144,42,0.35); margin-bottom: 8px;
+    }
+    .passport-entry-city {
+      font-family: var(--sans); font-size: 10px; font-weight: 500;
+      letter-spacing: 5px; text-transform: uppercase;
+      color: var(--text-primary); margin-bottom: 5px;
+    }
+    .passport-entry-film {
+      font-family: var(--serif); font-style: italic;
+      font-size: 15px; color: rgba(200,144,42,0.7);
+      line-height: 1.3; letter-spacing: 0.3px;
+    }
+    .passport-entry-loc {
+      font-size: 9px; color: var(--text-muted);
+      margin-top: 4px; letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+    .passport-entry-coord {
+      font-family: var(--sans); font-size: 7px;
+      color: rgba(136,128,117,0.25); letter-spacing: 2px;
+      margin-top: 3px;
+    }
+    .passport-entry-photo {
+      width: 100%; height: 64px; border-radius: 3px;
+      overflow: hidden; margin-top: 10px;
+      border: 1px solid rgba(200,144,42,0.08);
+    }
+    .passport-entry-photo img { width: 100%; height: 100%; object-fit: cover; filter: saturate(0.7) brightness(0.9); }
+
+    .passport-trivia {
+      margin-top: 10px; padding: 8px 12px;
+      border-left: 1.5px solid rgba(200,144,42,0.2);
+      background: rgba(200,144,42,0.02);
+    }
+    .passport-trivia-label { font-size: 7px; letter-spacing: 3px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; font-family: var(--sans); }
+    .passport-trivia-text { font-family: var(--serif); font-style: italic; font-size: 11px; line-height: 1.6; color: rgba(200,200,190,0.5); }
+
+    .passport-footer {
+      margin-top: 28px; padding-top: 20px;
+      border-top: 1px solid rgba(200,144,42,0.06);
+    }
+    .passport-progress-label { font-size: 7px; letter-spacing: 4px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; }
+    .passport-progress-bar { width: 100%; height: 2px; background: rgba(255,255,255,0.04); border-radius: 1px; overflow: hidden; margin-bottom: 8px; }
+    .passport-progress-fill { height: 100%; background: linear-gradient(90deg, rgba(200,144,42,0.3), var(--amber)); border-radius: 1px; transition: width 0.8s ease; }
+    .passport-progress-count { font-size: 11px; color: var(--text-secondary); font-family: var(--sans); }
+    .passport-progress-count span { color: var(--amber); font-weight: 600; }
+
+    .passport-badges { display: flex; gap: 7px; margin-top: 14px; }
+    .passport-badge {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; color: var(--text-muted); transition: all 0.4s ease;
+    }
+    .passport-badge.earned { border-color: rgba(200,144,42,0.4); background: rgba(200,144,42,0.08); color: var(--amber); }
+
+    .passport-empty { text-align: center; padding: 48px 16px; }
+    .passport-empty-icon { font-size: 28px; color: var(--text-muted); margin-bottom: 16px; opacity: 0.3; }
+    .passport-empty-title { font-family: var(--serif); font-size: 16px; color: var(--text-secondary); margin-bottom: 8px; }
+    .passport-empty-sub { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+
+    /* Empty Journey opening title card */
+    .journey-empty-hero {
+      position: absolute;
+      left: 50%;
+      top: 42%;
+      transform: translate(-50%, -50%) translateY(8px);
+      z-index: 845;
+      width: min(520px, calc(100vw - 48px));
+      padding: 34px 38px 32px;
+      text-align: center;
+      background: rgba(10, 10, 14, 0.58);
+      backdrop-filter: blur(26px) saturate(1.2);
+      -webkit-backdrop-filter: blur(26px) saturate(1.2);
+      border: 1px solid rgba(200, 144, 42, 0.16);
+      border-radius: 8px;
+      box-shadow:
+        0 20px 70px rgba(0,0,0,0.42),
+        0 0 40px rgba(200,144,42,0.05);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+
+    .journey-empty-hero.visible {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translate(-50%, -50%) translateY(0);
+    }
+
+    .journey-empty-kicker {
+      font-family: var(--sans);
+      font-size: 9px;
+      letter-spacing: 5px;
+      text-transform: uppercase;
+      color: rgba(200,144,42,0.65);
+      margin-bottom: 16px;
+    }
+
+    .journey-empty-title {
+      font-family: var(--serif);
+      font-size: clamp(28px, 4vw, 46px);
+      line-height: 1.08;
+      letter-spacing: 1.5px;
+      color: var(--text-primary);
+      margin-bottom: 18px;
+    }
+
+    .journey-empty-subtitle {
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+    }
+
+    .journey-empty-btn {
+      padding: 11px 26px;
+      background: transparent;
+      border: 1px solid rgba(200,144,42,0.42);
+      border-radius: 3px;
+      color: var(--amber);
+      font-family: var(--sans);
+      font-size: 11px;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .journey-empty-btn:hover {
+      background: rgba(200,144,42,0.08);
+      border-color: var(--amber);
+      box-shadow: 0 0 22px rgba(200,144,42,0.10);
+    }
+
+    /* Bottom horizontal check-in timeline */
+    .journey-bottom-timeline {
+      position: absolute;
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%);
+      width: min(1100px, calc(100vw - 80px));
+      min-height: 132px;
+      z-index: 840;
+      background: rgba(10, 10, 14, 0.72);
+      backdrop-filter: blur(28px) saturate(1.25);
+      -webkit-backdrop-filter: blur(28px) saturate(1.25);
+      border: 1px solid rgba(200, 144, 42, 0.12);
+      border-radius: 8px;
+      box-shadow: 0 18px 60px rgba(0,0,0,0.45);
+      padding: 18px 22px 16px;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    .journey-bottom-timeline.empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+    }
+
+    .timeline-empty-state {
+      width: 100%;
+      text-align: center;
+      padding: 18px 20px;
+    }
+
+    .timeline-empty-title {
+      font-family: var(--sans);
+      font-size: 9px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: rgba(200,144,42,0.65);
+      margin-bottom: 8px;
+    }
+
+    .timeline-empty-sub {
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 15px;
+      color: var(--text-secondary);
+    }
+    .timeline-empty-state .timeline-share-btn { margin-top: 14px; }
+    .timeline-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 20px;
+      margin-bottom: 18px;
+    }
+    .timeline-title {
+      font-family: var(--sans);
+      font-size: 9px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: rgba(200,144,42,0.62);
+    }
+    .timeline-count {
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .timeline-track {
+      position: relative;
+      display: flex;
+      gap: 44px;
+      min-width: max-content;
+      padding: 10px 8px 4px;
+    }
+    .timeline-track::before {
+      content: '';
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      top: 25px;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(200,144,42,0.05), rgba(200,144,42,0.42), rgba(200,144,42,0.05));
+    }
+    .timeline-node {
+      position: relative;
+      width: 150px;
+      cursor: pointer;
+    }
+    .timeline-dot {
+      width: 13px; height: 13px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 12px rgba(200,144,42,0.8), 0 0 28px rgba(200,144,42,0.35);
+      margin-bottom: 12px;
+      position: relative;
+      z-index: 1;
+      transition: transform var(--transition);
+    }
+    .timeline-date {
+      font-size: 8px;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: rgba(200,144,42,0.55);
+      margin-bottom: 7px;
+    }
+    .timeline-film {
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 15px;
+      line-height: 1.2;
+      color: var(--text-primary);
+      margin-bottom: 5px;
+      transition: color var(--transition);
+    }
+    .timeline-location {
+      font-size: 10px;
+      line-height: 1.35;
+      color: var(--text-secondary);
+    }
+    .timeline-city {
+      margin-top: 4px;
+      font-size: 8px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .timeline-node:hover .timeline-film { color: var(--amber); }
+    .timeline-node:hover .timeline-dot { transform: scale(1.18); }
+
+    /* Share Journey button beside bottom timeline */
+    .timeline-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+    .timeline-share-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 13px;
+      background: rgba(200,144,42,0.08);
+      border: 1px solid rgba(200,144,42,0.28);
+      border-radius: 999px;
+      color: var(--amber);
+      font-family: var(--sans);
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all var(--transition);
+      white-space: nowrap;
+    }
+    .timeline-share-btn:hover {
+      background: rgba(200,144,42,0.15);
+      border-color: rgba(200,144,42,0.55);
+      box-shadow: 0 0 22px rgba(200,144,42,0.12);
+      transform: translateY(-1px);
+    }
+    .timeline-share-btn i { font-size: 11px; }
+
+    .share-modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 4200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.78);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--transition);
+    }
+    .share-modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .share-modal-content {
+      width: min(920px, calc(100vw - 36px));
+      max-height: calc(100vh - 48px);
+      overflow-y: auto;
+      background: rgba(14,14,16,0.96);
+      border: 1px solid rgba(200,144,42,0.18);
+      border-radius: 10px;
+      box-shadow: 0 24px 90px rgba(0,0,0,0.65);
+      padding: 26px;
+      position: relative;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 28px;
+    }
+    .share-modal-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 32px;
+      height: 32px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 50%;
+      background: rgba(255,255,255,0.03);
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 19px;
+      line-height: 1;
+    }
+    .share-preview-frame {
+      width: 100%;
+      background: #080808;
+      border: 1px solid rgba(200,144,42,0.12);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 14px 44px rgba(0,0,0,0.48);
+    }
+    #sharePreviewCanvas {
+      width: 100%;
+      height: auto;
+      display: block;
+      background: #0D0D0D;
+    }
+    .share-modal-kicker {
+      font-size: 9px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: rgba(200,144,42,0.62);
+      margin-bottom: 10px;
+    }
+    .share-modal-title {
+      font-family: var(--serif);
+      font-size: 30px;
+      line-height: 1.12;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+    }
+    .share-modal-copy {
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text-secondary);
+      margin-bottom: 22px;
+    }
+    .share-format-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .share-format-card {
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 16px;
+      background: rgba(255,255,255,0.025);
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .share-format-card:hover,
+    .share-format-card.active {
+      border-color: rgba(200,144,42,0.44);
+      background: rgba(200,144,42,0.07);
+    }
+    .share-format-name {
+      font-family: var(--serif);
+      font-size: 17px;
+      color: var(--text-primary);
+      margin-bottom: 5px;
+    }
+    .share-format-desc {
+      font-size: 11px;
+      line-height: 1.55;
+      color: var(--text-muted);
+    }
+    .share-modal-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+    .share-action-btn {
+      padding: 12px 18px;
+      border-radius: 4px;
+      border: 1px solid rgba(200,144,42,0.38);
+      background: transparent;
+      color: var(--amber);
+      font-family: var(--sans);
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .share-action-btn.primary {
+      background: var(--amber);
+      color: var(--bg-primary);
+      border-color: var(--amber);
+      font-weight: 600;
+    }
+    .share-action-btn:hover { transform: translateY(-1px); }
+    .share-status {
+      min-height: 18px;
+      margin-top: 12px;
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+    .share-status.error { color: #D94040; }
+    .share-status.ready { color: var(--amber); }
+
+    @media (max-width: 860px) {
+      .share-modal-content { grid-template-columns: 1fr; }
+      .share-preview-frame { max-width: 360px; margin: 0 auto; }
+      .share-format-grid { grid-template-columns: 1fr; }
+      .timeline-title-row { align-items: flex-start; flex-direction: column; }
+      .timeline-actions { margin-left: 0; }
+    }
+
+
+    @media (max-width: 768px) {
+      .journey-empty-hero {
+        top: 40%;
+        width: calc(100vw - 32px);
+        padding: 28px 22px 26px;
+      }
+      .journey-empty-kicker { letter-spacing: 3.5px; }
+      .journey-empty-title { font-size: 28px; }
+      .journey-empty-subtitle { font-size: 12px; }
+    }
+
+    /* Hover labels on canvas */
+    .neon-city-label {
+      position: absolute;
+      display: flex; flex-direction: column; align-items: center;
+      pointer-events: none;
+      transform: translate(-50%, 16px);
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      gap: 1px;
+    }
+    .neon-city-label.visible { opacity: 1; }
+    .neon-city-name {
+      font-family: var(--sans); font-size: 8px; font-weight: 500;
+      letter-spacing: 4px; text-transform: uppercase;
+      color: rgba(200,144,42,0.85);
+      text-shadow: 0 0 12px rgba(200,144,42,0.5);
+      padding: 2px 8px;
+      background: rgba(10,10,14,0.6);
+      backdrop-filter: blur(8px);
+      border-radius: 2px;
+    }
+    .neon-city-coord {
+      font-family: var(--sans); font-size: 6px;
+      letter-spacing: 2px;
+      color: rgba(136,128,117,0.3);
+    }
+
+    .trivia-quiz-widget { margin-top: 10px; padding: 10px; background: rgba(20,20,26,0.5); border: 1px solid rgba(255,255,255,0.05); border-radius: 3px; }
+    .trivia-quiz-question { font-family: var(--serif); font-size: 12px; color: var(--text-primary); line-height: 1.5; margin-bottom: 8px; }
+    .trivia-quiz-options { display: flex; flex-direction: column; gap: 4px; }
+    .trivia-quiz-opt { padding: 6px 10px; background: transparent; border: 1px solid rgba(255,255,255,0.06); border-radius: 2px; font-size: 10px; color: var(--text-secondary); cursor: pointer; transition: all var(--transition); text-align: left; font-family: var(--sans); }
+    .trivia-quiz-opt:hover { border-color: rgba(200,144,42,0.3); color: var(--text-primary); }
+    .trivia-quiz-opt.correct { border-color: #7BC67B; color: #7BC67B; background: rgba(123,198,123,0.06); }
+    .trivia-quiz-opt.wrong { border-color: #D94040; color: #D94040; background: rgba(217,64,64,0.06); }
+    .trivia-quiz-result { font-size: 10px; color: var(--text-secondary); margin-top: 6px; line-height: 1.5; font-style: italic; }
+    .trivia-label { font-size: 7px; letter-spacing: 3px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; font-family: var(--sans); }
+
+    .achievement-toast {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0.8);
+      background: var(--bg-primary); border: 2px solid var(--amber);
+      border-radius: 4px; padding: 32px 48px; text-align: center;
+      z-index: 5000; opacity: 0; pointer-events: none; transition: all 0.4s ease;
+    }
+    .achievement-toast.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    .achievement-title { font-family: var(--serif); font-size: 20px; color: var(--amber); letter-spacing: 2px; margin-bottom: 4px; }
+    .achievement-sub { font-size: 12px; color: var(--text-muted); }
+
+    /* ======= ABOUT US ======= */
+    #aboutView {
+      position: fixed; top: var(--nav-height); left: 0; right: 0; bottom: 0;
+      z-index: 800; background: var(--bg-primary); overflow-y: auto; display: none;
+    }
+    #aboutView.active { display: block; }
+    .about-container { max-width: 760px; margin: 0 auto; padding: 80px 40px 120px; }
+    .about-headline { font-family: var(--serif); font-size: 40px; color: var(--text-primary); line-height: 1.2; margin-bottom: 16px; font-weight: 700; }
+    .about-manifesto { font-family: var(--serif); font-style: italic; font-size: 18px; color: var(--amber); line-height: 1.5; margin-bottom: 48px; padding-left: 20px; border-left: 2px solid var(--amber-dim); }
+    .about-body { font-size: 15px; line-height: 1.8; color: var(--text-secondary); margin-bottom: 64px; }
+    .about-section-title { font-family: var(--sans); font-size: 10px; letter-spacing: 4px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 24px; font-weight: 500; }
+    .team-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 64px; }
+    .team-card { padding: 24px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; }
+    .team-name { font-family: var(--serif); font-size: 18px; color: var(--text-primary); margin-bottom: 4px; }
+    .team-role { font-size: 12px; color: var(--amber); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+    .team-bio { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+    .about-credits { border-top: 1px solid var(--border); padding-top: 32px; font-size: 12px; color: var(--text-muted); line-height: 1.8; }
+
+    /* Locations drawer / left filter panel */
+    .locations-drawer {
+      position: fixed; top: var(--nav-height); left: 0; bottom: 0;
+      width: 340px; background: rgba(13, 13, 13, 0.97);
+      backdrop-filter: blur(16px); border-right: 1px solid var(--border);
+      z-index: 960; transform: translateX(-100%); transition: transform var(--transition);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .locations-drawer.open { transform: translateX(0); }
+    .drawer-header {
+      flex-shrink: 0; padding: 20px 20px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .drawer-title { font-family: var(--serif); font-size: 18px; color: var(--text-primary); margin-bottom: 4px; }
+    .drawer-subtitle { font-size: 11px; color: var(--text-muted); letter-spacing: 1.5px; text-transform: uppercase; }
+    .drawer-close { position: absolute; top: 16px; right: 16px; background: none; border: none; color: var(--text-secondary); font-size: 18px; cursor: pointer; }
+    .drawer-body { flex: 1; overflow-y: auto; padding: 8px 0; }
+
+    /* Flat location list in drawer */
+    .drawer-flat-item {
+      padding: 11px 20px; cursor: pointer;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      transition: background var(--transition);
+    }
+    .drawer-flat-item:hover { background: var(--bg-hover); }
+    .drawer-flat-item.active { background: rgba(200,144,42,0.06); border-left: 2px solid var(--amber); }
+    .drawer-flat-main {
+      display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px;
+    }
+    .drawer-flat-loc {
+      font-size: 13px; color: var(--text-primary); font-family: var(--sans); font-weight: 500;
+    }
+    .drawer-flat-city {
+      font-size: 10px; color: var(--text-muted); letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+    .drawer-flat-film {
+      font-family: var(--serif); font-style: italic;
+      font-size: 12px; color: var(--amber-dim);
+    }
+
+    .drawer-empty { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 13px; line-height: 1.6; }
+
+    /* Filter chips in nav */
+    .nav-filter-chips {
+      display: flex; gap: 6px; align-items: center;
+    }
+    .nav-filter-chip {
+      padding: 5px 14px; border: 1px solid var(--border); border-radius: 20px;
+      font-size: 12px; font-family: var(--sans); letter-spacing: 0.3px;
+      color: var(--text-secondary); background: var(--bg-secondary);
+      cursor: pointer; transition: all var(--transition); white-space: nowrap;
+      height: 32px; display: flex; align-items: center; gap: 6px;
+    }
+    .nav-filter-chip:hover { border-color: var(--amber-dim); color: var(--text-primary); }
+    .nav-filter-chip.active {
+      border-color: var(--amber); color: var(--amber);
+      background: rgba(200,144,42,0.10);
+    }
+    .nav-filter-chip .chip-x {
+      font-size: 14px; opacity: 0.7; line-height: 1;
+      display: none;
+    }
+    .nav-filter-chip.active .chip-x { display: inline; }
+    .chip-arrow {
+      font-size: 8px; opacity: 0.5; line-height: 1;
+      transition: transform 0.2s ease;
+    }
+    .nav-filter-chip.open .chip-arrow { transform: rotate(180deg); }
+
+    /* Filter picker dropdown (appears below chips, not the left drawer) */
+    .filter-picker-dropdown {
+      position: fixed;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      min-width: 200px;
+      max-height: 280px;
+      overflow-y: auto;
+      z-index: 1050;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      display: none;
+    }
+    .filter-picker-dropdown.open { display: block; }
+    .filter-picker-header {
+      padding: 10px 14px 6px;
+      font-size: 9px; letter-spacing: 2.5px; text-transform: uppercase;
+      color: var(--text-muted); font-family: var(--sans); font-weight: 500;
+      border-bottom: 1px solid var(--border);
+    }
+    .filter-picker-item {
+      padding: 10px 16px; cursor: pointer;
+      font-size: 13px; color: var(--text-primary);
+      font-family: var(--sans);
+      transition: background var(--transition);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .filter-picker-item:hover { background: var(--bg-hover); }
+    .filter-picker-item.selected { color: var(--amber); }
+    .filter-picker-item .item-check { color: var(--amber); font-size: 11px; opacity: 0; }
+    .filter-picker-item.selected .item-check { opacity: 1; }
+
+    /* Locations count button — bottom left */
+    .panel-open-btn {
+      position: fixed; bottom: 20px; left: 20px; z-index: 900;
+      display: flex; align-items: center; gap: 0; cursor: pointer;
+      padding: 8px 14px; background: rgba(13,13,13,0.88);
+      backdrop-filter: blur(10px); border: 1px solid var(--border);
+      border-radius: 3px; transition: all var(--transition);
+      font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase;
+      color: var(--text-secondary); font-family: var(--sans); font-weight: 500;
+    }
+    .panel-open-btn:hover { border-color: var(--amber-dim); color: var(--text-primary); }
+    .panel-open-btn .count-num { color: var(--amber); text-decoration: underline; text-underline-offset: 3px; }
+
+
+
+    /* Stable bottom journey timeline + share action layout */
+    .journey-bottom-timeline {
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .timeline-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      min-width: 0;
+      margin-bottom: 18px;
+    }
+    .timeline-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .timeline-track {
+      position: relative;
+      display: flex;
+      gap: 44px;
+      min-width: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 10px 8px 8px;
+      scroll-behavior: smooth;
+    }
+    .timeline-track::before {
+      content: '';
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      top: 25px;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(200,144,42,0.05), rgba(200,144,42,0.42), rgba(200,144,42,0.05));
+      pointer-events: none;
+    }
+    .timeline-node {
+      position: relative;
+      flex: 0 0 150px;
+      width: 150px;
+      cursor: pointer;
+      z-index: 1;
+    }
+    .timeline-share-btn {
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .journey-bottom-timeline.empty {
+      justify-content: center;
+    }
+    .timeline-empty-state {
+      width: 100%;
+      text-align: center;
+    }
+
+    /* Film grain effect */
+    .film-grain {
+      position: fixed; inset: 0; z-index: 9999;
+      pointer-events: none; opacity: 0.04;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      :root { --panel-width: 340px; }
+      .search-container { width: 260px; }
+      .tab-nav { gap: 20px; }
+      .passport-sidebar { width: 320px; }
+    }
+    @media (max-width: 768px) {
+      :root { --panel-width: 100%; --nav-height: 56px; }
+      #topNav { padding: 0 16px; }
+      .search-container { width: 180px; }
+      .tab-nav { gap: 14px; }
+      .tab-btn { font-size: 12px; }
+      .logo-title { font-size: 18px; }
+      .passport-sidebar { width: 100%; }
+      .locations-drawer { width: 100%; }
+      .journey-bottom-timeline {
+        left: 12px;
+        right: 12px;
+        bottom: 16px;
+        width: auto;
+        transform: none;
+        padding: 14px 16px;
+      }
+      .timeline-title-row { align-items: flex-start; flex-direction: column; gap: 10px; }
+      .timeline-actions { width: 100%; justify-content: space-between; }
+      .timeline-track { gap: 30px; }
+      .timeline-node { flex-basis: 130px; width: 130px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Film grain overlay -->
+  <div class="film-grain"></div>
+
+  <!-- TOP NAVIGATION -->
+  <nav id="topNav">
+    <div class="logo-lockup">
+      <span class="logo-title">CINESPOT</span>
+      <span class="logo-subtitle">BELGIUM</span>
+    </div>
+
+    <div class="search-container">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+      </svg>
+      <input type="text" class="search-bar" id="searchInput" placeholder="Search films, directors, locations..." autocomplete="off">
+      <div class="search-dropdown" id="searchDropdown"></div>
+    </div>
+
+    <div class="nav-filter-chips" id="navFilterChips">
+      <button class="nav-filter-chip" id="chipByFilm" data-type="film">
+        <span class="chip-label">By Film</span>
+        <span class="chip-arrow">▼</span>
+        <span class="chip-x">×</span>
+      </button>
+      <button class="nav-filter-chip" id="chipByLocation" data-type="location">
+        <span class="chip-label">By City</span>
+        <span class="chip-arrow">▼</span>
+        <span class="chip-x">×</span>
+      </button>
+    </div>
+
+    <!-- Filter picker dropdown (rendered inline, positioned by JS) -->
+    <div class="filter-picker-dropdown" id="filterPickerDropdown">
+      <div class="filter-picker-header" id="filterPickerHeader"></div>
+      <div id="filterPickerList"></div>
+    </div>
+
+    <div class="tab-nav">
+      <button class="tab-btn active" data-tab="map">Map</button>
+      <button class="tab-btn" data-tab="journey">My Journey</button>
+      <button class="tab-btn" data-tab="about">About Us</button>
+    </div>
+  </nav>
+
+  <!-- MAP -->
+  <div id="mapContainer">
+    <div id="map"></div>
+  </div>
+
+  <!-- STATUS BAR removed -->
+
+  <!-- RIGHT INFO PANEL -->
+  <div id="rightPanel">
+    <button class="panel-close" id="panelClose">&times;</button>
+    <div class="film-poster" id="filmPoster">
+      <div class="film-poster-placeholder" id="posterPlaceholder">
+        <span id="posterTitle"></span>
+      </div>
+      <img id="posterImg" src="" alt="" style="display:none">
+      <div class="film-poster-gradient"></div>
+    </div>
+    <div class="panel-body">
+      <h2 class="film-title" id="panelTitle"></h2>
+      <div class="film-meta" id="panelMeta"></div>
+      <div class="film-rating" id="panelRating">
+        <span class="film-rating-star">&#9733;</span>
+        <span id="panelScore"></span>
+      </div>
+      <div class="film-genres" id="panelGenres"></div>
+      <p class="film-synopsis" id="panelSynopsis"></p>
+      <a class="imdb-link" id="panelImdb" href="#" target="_blank" rel="noopener">
+        View on IMDb
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+          <polyline points="15 3 21 3 21 9"/>
+          <line x1="10" y1="14" x2="21" y2="3"/>
+        </svg>
+      </a>
+
+      <div class="section-label">Filming Locations</div>
+      <div id="panelLocations"></div>
+
+      <div class="checkin-section" id="checkinSection"></div>
+      <div class="photo-section" id="photoSection"></div>
+    </div>
+  </div>
+
+  <!-- LEFT FILTER PANEL toggle — bottom left with live counts -->
+  <button class="panel-open-btn" id="panelOpenBtn">
+    <span class="count-num" id="btnLocCount">—</span>&nbsp;Locations&nbsp;&middot;&nbsp;<span class="count-num" id="btnFilmCount">—</span>&nbsp;Films
+  </button>
+
+  <div class="locations-drawer" id="locationsDrawer">
+    <div class="drawer-header">
+      <button class="drawer-close" id="drawerClose">&times;</button>
+      <div class="drawer-title">Filming Locations</div>
+      <div class="drawer-subtitle" id="drawerSubtitle">All locations</div>
+    </div>
+    <div class="drawer-body" id="drawerList"></div>
+  </div>
+
+  <!-- MY JOURNEY VIEW -->
+  <div id="journeyView">
+    <!-- Fullscreen neon canvas -->
+    <div class="journey-canvas-area">
+      <canvas id="journeyCanvas"></canvas>
+    </div>
+
+    <!-- Empty state opening card -->
+    <div class="journey-empty-hero" id="journeyEmptyHero" aria-live="polite">
+      <div class="journey-empty-kicker">CINESPOT PASSPORT</div>
+      <div class="journey-empty-title">
+        EVERY FRAME BEGINS<br>
+        WITH A FIRST STEP
+      </div>
+      <div class="journey-empty-subtitle">
+        Check in at a filming location to light up your map.
+      </div>
+      <button class="journey-empty-btn" id="journeyEmptyExploreBtn" type="button">
+        Explore Map
+      </button>
+    </div>
+
+    <!-- Bottom check-in timeline -->
+    <div class="journey-bottom-timeline" id="journeyBottomTimeline"></div>
+  </div>
+
+  <!-- ABOUT US VIEW -->
+  <div id="aboutView">
+    <div class="about-container">
+      <h1 class="about-headline">Every frame has an address.</h1>
+      <p class="about-manifesto">Belgium is a film set. We're just helping you find your mark.</p>
+      <p class="about-body">
+        CineSpot Belgium maps the real locations behind iconic films shot across the country.
+        From the medieval streets of Bruges to the industrial heartland of Wallonia, Belgian cinema
+        has always drawn from the landscapes that surround it. We built this platform to connect
+        cinephiles with the physical spaces that shaped their favorite scenes &mdash; and to encourage
+        a new way of experiencing film: on foot, at the source.
+      </p>
+
+      <div class="about-section-title">The Team</div>
+      <div class="team-grid">
+        <div class="team-card">
+          <div class="team-name">Yi Yi</div>
+          <div class="team-role">Project Lead</div>
+          <div class="team-bio">Connecting cinema and geography through interactive storytelling.</div>
+        </div>
+        <div class="team-card">
+          <div class="team-name">CineSpot Lab</div>
+          <div class="team-role">Design & Development</div>
+          <div class="team-bio">A small studio dedicated to cinematic digital experiences.</div>
+        </div>
+        <div class="team-card">
+          <div class="team-name">Open Data</div>
+          <div class="team-role">Data Sources</div>
+          <div class="team-bio">Film metadata sourced from Wikidata, TMDB, the seed dataset, and community contributions.</div>
+        </div>
+      </div>
+
+      <div class="about-credits">
+        Built with care in Belgium. Film data from Wikidata and TMDB. Map tiles by CARTO.
+        <br>No sets were built. Every location is real.
+      </div>
+    </div>
+  </div>
+
+  <!-- UPLOAD MODAL -->
+  <div class="modal-overlay" id="uploadModal">
+    <div class="modal-content">
+      <button class="modal-close" id="modalClose">&times;</button>
+      <div class="modal-title">Upload Your Visit</div>
+      <div class="dropzone" id="dropzone">
+        <div class="dropzone-text">Drag a photo here, or</div>
+        <label class="dropzone-btn">
+          Choose File
+          <input type="file" accept="image/*" id="fileInput" style="display:none">
+        </label>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- SHARE JOURNEY MODAL -->
+  <div class="share-modal-overlay" id="shareModal" aria-hidden="true">
+    <div class="share-modal-content" role="dialog" aria-modal="true" aria-labelledby="shareModalTitle">
+      <button class="share-modal-close" id="shareModalClose" type="button">&times;</button>
+      <div class="share-preview-frame">
+        <canvas id="sharePreviewCanvas" width="1080" height="1350"></canvas>
+      </div>
+      <div class="share-modal-panel">
+        <div class="share-modal-kicker">Share My Journey</div>
+        <h2 class="share-modal-title" id="shareModalTitle">Turn your check-ins into a cinematic poster.</h2>
+        <p class="share-modal-copy">
+          Choose a clean static poster or an animated journey GIF. Both formats use your current check-ins, lit regions, and recent film-location stamps.
+        </p>
+        <div class="share-format-grid" id="shareFormatGrid">
+          <div class="share-format-card active" data-share-format="png">
+            <div class="share-format-name">Static Poster</div>
+            <div class="share-format-desc">Best for saving, printing, Instagram posts, Xiaohongshu, or WeChat Moments.</div>
+          </div>
+          <div class="share-format-card" data-share-format="gif">
+            <div class="share-format-name">Animated Journey</div>
+            <div class="share-format-desc">A short GIF with region lighting, route reveal, and stamp summary.</div>
+          </div>
+        </div>
+        <div class="share-modal-actions">
+          <button class="share-action-btn primary" id="shareGenerateBtn" type="button">Save as Image</button>
+          <button class="share-action-btn" id="shareRefreshPreviewBtn" type="button">Refresh Preview</button>
+        </div>
+        <div class="share-status" id="shareStatus"></div>
+      </div>
+    </div>
+  </div>
+
+    <!-- CHECK-IN STAMP OVERLAY -->
+  <div class="stamp-overlay" id="stampOverlay">
+    <div class="stamp-frame">
+      <div class="stamp-filmstrip">
+        <div class="stamp-sprocket"></div><div class="stamp-sprocket"></div>
+        <div class="stamp-sprocket"></div><div class="stamp-sprocket"></div>
+        <div class="stamp-sprocket"></div><div class="stamp-sprocket"></div>
+        <div class="stamp-sprocket"></div><div class="stamp-sprocket"></div>
+      </div>
+      <div class="stamp-circle">
+        <div class="stamp-circle-inner">
+          <div class="stamp-text-top">Location Stamped</div>
+          <div class="stamp-location" id="stampLocation"></div>
+          <div class="stamp-text-bottom" id="stampDate"></div>
+          <div class="stamp-checkmark">VERIFIED</div>
+        </div>
+      </div>
+      <div class="stamp-filmstrip stamp-filmstrip-bottom">
+        <div class="stamp-sprocket"></div><div class="stamp-sprocket"></div>
+        <div class="stamp-sprocket"></div><div class="stamp-sprocket"></div>
+        <div class="stamp-sprocket"></div><div class="stamp-sprocket"></div>
+        <div class="stamp-sprocket"></div><div class="stamp-sprocket"></div>
+      </div>
+    </div>
+    <div class="stamp-cta">
+      <button class="stamp-cta-btn" id="stampJourneyBtn">View My Journey</button>
+    </div>
+  </div>
+
+  <!-- ACHIEVEMENT TOAST -->
+  <div class="achievement-toast" id="achievementToast">
+    <div class="achievement-title" id="achievementTitle"></div>
+    <div class="achievement-sub" id="achievementSub"></div>
+  </div>
+
+  <!-- SCRIPTS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+  (function() {
+    'use strict';
+
+    // ============ CONFIG ============
+    const TMDB_API_KEY = '6b87f46eef0f2c293e691a30852f409f';
+    const TMDB_IMG_BASE = 'https://image.tmdb.org/t/p/w500';
+    const GOOGLE_MAPS_KEY = 'AIzaSyDmAuqh3wdTSRnN0CacVYQMbi86bJXdtYY';
+
+    // ============ DATA ============
+    const SEED_LOCATIONS = [
+      {
+        id: 'in-bruges-markt',
+        filmTitle: 'In Bruges',
+        year: 2008,
+        director: 'Martin McDonagh',
+        imdbRating: 7.9,
+        imdbId: 'tt0780536',
+        tmdbId: 8321,
+        genres: ['Crime', 'Drama', 'Comedy'],
+        posterUrl: null,
+        movieStillUrl: 'https://image.tmdb.org/t/p/w780/pwq1sMCPMYj1BfVydo2v4YHeVkK.jpg',
+        lat: 51.2093,
+        lng: 3.2247,
+        locationName: 'Markt Square',
+        city: 'Bruges',
+        region: 'flanders',
+        locationDescription: 'The main square seen throughout the film, where the characters wander between assignments and existential crises.',
+        checkedIn: false,
+        userPhoto: null,
+        checkInDate: null,
+        trivia: 'In Bruges was filmed entirely on location in Belgium over 33 days. Director Martin McDonagh chose Bruges because he found it eerily beautiful, like a fairy tale gone wrong.',
+        markerIcon: 'fa-clapperboard'
+      },
+      {
+        id: 'in-bruges-belfry',
+        filmTitle: 'In Bruges',
+        year: 2008,
+        director: 'Martin McDonagh',
+        imdbRating: 7.9,
+        imdbId: 'tt0780536',
+        tmdbId: 8321,
+        genres: ['Crime', 'Drama', 'Comedy'],
+        posterUrl: null,
+        movieStillUrl: 'https://image.tmdb.org/t/p/w780/pwq1sMCPMYj1BfVydo2v4YHeVkK.jpg',
+        lat: 51.2082,
+        lng: 3.2243,
+        locationName: 'Belfry of Bruges',
+        city: 'Bruges',
+        region: 'flanders',
+        locationDescription: 'The 83-meter medieval bell tower where the film\'s climactic chase sequence unfolds.',
+        checkedIn: false,
+        userPhoto: null,
+        checkInDate: null,
+        trivia: 'The Belfry has 366 steps to the top. Colin Farrell actually climbed them multiple times during filming.',
+        markerIcon: 'fa-tower-observation'
+      },
+      {
+        id: 'mr-nobody-brussels',
+        filmTitle: 'Mr. Nobody',
+        year: 2009,
+        director: 'Jaco Van Dormael',
+        imdbRating: 7.8,
+        imdbId: 'tt0485947',
+        tmdbId: 31011,
+        genres: ['Drama', 'Fantasy', 'Romance'],
+        posterUrl: null,
+        movieStillUrl: 'https://image.tmdb.org/t/p/w780/8BTMiLMWIBm3sIIAMldMVgo3STd.jpg',
+        lat: 50.8467,
+        lng: 4.3525,
+        locationName: 'Brussels Central Station',
+        city: 'Brussels',
+        region: 'brussels',
+        locationDescription: 'A key junction in the multiverse narrative, the station platform where life-altering choices diverge.',
+        checkedIn: false,
+        userPhoto: null,
+        checkInDate: null,
+        trivia: 'Mr. Nobody was the last major film to be shot on 35mm film in Belgium. It took three years to edit because of its complex parallel storylines.',
+        markerIcon: 'fa-film'
+      },
+      {
+        id: 'girl-antwerp',
+        filmTitle: 'Girl',
+        year: 2018,
+        director: 'Lukas Dhont',
+        imdbRating: 7.1,
+        imdbId: 'tt8254556',
+        tmdbId: 515916,
+        genres: ['Drama'],
+        posterUrl: null,
+        movieStillUrl: 'https://image.tmdb.org/t/p/w780/reEMjjQwBiFpBsXAbcGLhXnEJB8.jpg',
+        lat: 51.2194,
+        lng: 4.4025,
+        locationName: 'Royal Ballet School of Antwerp',
+        city: 'Antwerp',
+        region: 'flanders',
+        locationDescription: 'The dance academy where Lara pursues her dream, filmed at the real institution.',
+        checkedIn: false,
+        userPhoto: null,
+        checkInDate: null,
+        trivia: 'Victor Polster trained in ballet for eight months before filming. Director Lukas Dhont won the Camera d\'Or at Cannes for this debut.',
+        markerIcon: 'fa-masks-theater'
+      },
+      {
+        id: 'rosetta-seraing',
+        filmTitle: 'Rosetta',
+        year: 1999,
+        director: 'Jean-Pierre & Luc Dardenne',
+        imdbRating: 7.4,
+        imdbId: 'tt0200071',
+        tmdbId: 11489,
+        genres: ['Drama'],
+        posterUrl: null,
+        movieStillUrl: 'https://image.tmdb.org/t/p/w780/vAcRamJGeGwBJrItCCfBgKXlJk3.jpg',
+        lat: 50.5910,
+        lng: 5.4981,
+        locationName: 'Industrial Zone, Seraing',
+        city: 'Seraing',
+        region: 'wallonia',
+        locationDescription: 'The post-industrial landscape where Rosetta fights for survival among abandoned factories and trailer parks.',
+        checkedIn: false,
+        userPhoto: null,
+        checkInDate: null,
+        trivia: 'After Rosetta won the Palme d\'Or, the Belgian government passed the "Rosetta Plan" law to protect youth employment rights. Cinema literally changed the law.',
+        markerIcon: 'fa-video'
+      },
+      {
+        id: 'brand-new-testament-brussels',
+        filmTitle: 'The Brand New Testament',
+        year: 2015,
+        director: 'Jaco Van Dormael',
+        imdbRating: 7.1,
+        imdbId: 'tt3792960',
+        tmdbId: 330764,
+        genres: ['Comedy', 'Fantasy'],
+        posterUrl: null,
+        movieStillUrl: 'https://image.tmdb.org/t/p/w780/kIGLvnTYVJLiyHk7wGBIoLRe2ZL.jpg',
+        lat: 50.8503,
+        lng: 4.3517,
+        locationName: 'Place du Jeu de Balle, Brussels',
+        city: 'Brussels',
+        region: 'brussels',
+        locationDescription: 'The flea market square in the Marolles district, the earthly domain of God\'s apartment in the film\'s cosmology.',
+        checkedIn: false,
+        userPhoto: null,
+        checkInDate: null,
+        trivia: 'Van Dormael imagined God living in a Brussels apartment because he wanted the divine to be as mundane as possible.',
+        markerIcon: 'fa-clapperboard'
+      },
+      {
+        id: 'two-days-liege',
+        filmTitle: 'Two Days, One Night',
+        year: 2014,
+        director: 'Jean-Pierre & Luc Dardenne',
+        imdbRating: 7.3,
+        imdbId: 'tt2737050',
+        tmdbId: 221902,
+        genres: ['Drama'],
+        posterUrl: null,
+        movieStillUrl: 'https://image.tmdb.org/t/p/w780/rv3iySZ2bUxPfFjD8V1eu4Bfk0j.jpg',
+        lat: 50.6325,
+        lng: 5.5667,
+        locationName: 'Suburbs of Liege',
+        city: 'Liege',
+        region: 'wallonia',
+        locationDescription: 'The residential neighborhoods Sandra crosses on her desperate weekend campaign to save her job.',
+        checkedIn: false,
+        userPhoto: null,
+        checkInDate: null,
+        trivia: 'Marion Cotillard learned to speak with a Belgian accent for the role. The Dardenne brothers rehearsed for six months before filming.',
+        markerIcon: 'fa-film'
+      },
+      {
+        id: 'bullhead-limburg',
+        filmTitle: 'Bullhead',
+        year: 2011,
+        director: 'Michael R. Roskam',
+        imdbRating: 7.0,
+        imdbId: 'tt1821593',
+        tmdbId: 63310,
+        genres: ['Crime', 'Drama', 'Thriller'],
+        posterUrl: null,
+        movieStillUrl: 'https://image.tmdb.org/t/p/w780/9c7fzEkWCbUrC1iEbgRwSg37rpw.jpg',
+        lat: 50.9311,
+        lng: 5.3426,
+        locationName: 'Flemish Countryside, Limburg',
+        city: 'Limburg',
+        region: 'flanders',
+        locationDescription: 'The cattle farms and quiet lanes where the hormone mafia thriller unravels beneath a pastoral surface.',
+        checkedIn: false,
+        userPhoto: null,
+        checkInDate: null,
+        trivia: 'Bullhead was Belgium\'s first Oscar-nominated film in 13 years. Matthias Schoenaerts gained 27 kilograms of muscle for the role.',
+        markerIcon: 'fa-video'
+      },
+      {
+        id: 'man-bites-dog-brussels',
+        filmTitle: 'Man Bites Dog',
+        year: 1992,
+        director: 'Remy Belvaux',
+        imdbRating: 7.3,
+        imdbId: 'tt0103905',
+        tmdbId: 10086,
+        genres: ['Crime', 'Comedy', 'Horror'],
+        posterUrl: null,
+        movieStillUrl: 'https://image.tmdb.org/t/p/w780/sKhScf5UxgSpKgWvjOMihugm24D.jpg',
+        lat: 50.8796,
+        lng: 4.3500,
+        locationName: 'Laeken, Brussels',
+        city: 'Brussels',
+        region: 'brussels',
+        locationDescription: 'The working-class streets transformed into the banal hunting grounds of a serial killer followed by a documentary crew.',
+        checkedIn: false,
+        userPhoto: null,
+        checkInDate: null,
+        trivia: 'Man Bites Dog was made for around $15,000 by three film students. The grainy footage was a budget necessity that became its most iconic stylistic choice.',
+        markerIcon: 'fa-masks-theater'
+      },
+      {
+        id: 'jeanne-dielman-brussels',
+        filmTitle: 'Jeanne Dielman',
+        year: 1975,
+        director: 'Chantal Akerman',
+        imdbRating: 7.8,
+        imdbId: 'tt0073198',
+        tmdbId: 44012,
+        genres: ['Drama'],
+        posterUrl: null,
+        movieStillUrl: 'https://image.tmdb.org/t/p/w780/ufPHqJkBjlqchMuMP1Kq0OP0Yj4.jpg',
+        lat: 50.8368,
+        lng: 4.3594,
+        locationName: 'Rue du Commerce, Ixelles',
+        city: 'Brussels',
+        region: 'brussels',
+        locationDescription: 'The apartment block where Akerman filmed her masterwork, three days observed with radical patience.',
+        checkedIn: false,
+        userPhoto: null,
+        checkInDate: null,
+        trivia: 'Voted the greatest film of all time by Sight & Sound in 2022. Akerman shot the film in her own neighborhood.',
+        markerIcon: 'fa-clapperboard'
+      }
+    ];
+
+    let LOCATIONS = [...SEED_LOCATIONS];
+
+    // Trivia quiz questions for My Journey
+    const TRIVIA_QUESTIONS = [
+      {
+        id: 'tq-bruges',
+        locationId: 'in-bruges-markt',
+        question: 'In "In Bruges," what is the name of the tower where the climactic scene takes place?',
+        options: ['Grand Place Tower', 'Belfry of Bruges', 'Church of Our Lady', 'Bruges Cathedral'],
+        correct: 1,
+        badge: 'bruges-explorer',
+        explanation: 'The Belfry of Bruges, standing 83 meters tall, is where the film\'s dramatic final confrontation unfolds.'
+      },
+      {
+        id: 'tq-rosetta',
+        locationId: 'rosetta-seraing',
+        question: 'What real-world impact did the film "Rosetta" have on Belgian law?',
+        options: ['Banned child labor', 'Passed the "Rosetta Plan" for youth employment', 'Created film tax incentives', 'Established worker unions'],
+        correct: 1,
+        badge: 'dardenne-devotee',
+        explanation: 'The film\'s portrayal of youth poverty directly led to Belgium\'s "Rosetta Plan" legislation protecting young workers.'
+      },
+      {
+        id: 'tq-jeanne',
+        locationId: 'jeanne-dielman-brussels',
+        question: 'In which year was "Jeanne Dielman" voted the greatest film of all time by Sight & Sound?',
+        options: ['2012', '2018', '2022', '2024'],
+        correct: 2,
+        badge: 'cinephile-scholar',
+        explanation: 'In the 2022 Sight & Sound poll, Jeanne Dielman topped the list, making Chantal Akerman\'s film the first by a female director to claim the top spot.'
+      },
+      {
+        id: 'tq-mrnobody',
+        locationId: 'mr-nobody-brussels',
+        question: 'What makes "Mr. Nobody" historically notable in Belgian cinema?',
+        options: ['First Belgian film in color', 'Last major film shot on 35mm in Belgium', 'First Belgian Oscar winner', 'Most expensive Belgian production'],
+        correct: 1,
+        badge: 'film-historian',
+        explanation: 'Mr. Nobody holds the distinction of being the last major Belgian film captured on 35mm celluloid.'
+      },
+      {
+        id: 'tq-bullhead',
+        locationId: 'bullhead-limburg',
+        question: 'How much weight did Matthias Schoenaerts gain for his role in "Bullhead"?',
+        options: ['10 kg', '18 kg', '27 kg', '35 kg'],
+        correct: 2,
+        badge: 'belgium-explorer',
+        explanation: 'Schoenaerts underwent an incredible physical transformation, gaining 27 kilograms of muscle for the role.'
+      }
+    ];
+
+    // Badges
+    const BADGES = [
+      { id: 'bruges-explorer', icon: 'fa-location-dot', label: 'Bruges' },
+      { id: 'dardenne-devotee', icon: 'fa-award', label: 'Dardenne' },
+      { id: 'cinephile-scholar', icon: 'fa-graduation-cap', label: 'Scholar' },
+      { id: 'film-historian', icon: 'fa-book', label: 'Historian' },
+      { id: 'belgium-explorer', icon: 'fa-compass', label: 'Explorer' },
+      { id: 'photographer', icon: 'fa-camera', label: 'Photo' },
+    ];
+
+
+    // ============ DYNAMIC DATA SYNC ============
+    const MOVIE_ICONS = ['fa-clapperboard', 'fa-film', 'fa-video', 'fa-masks-theater', 'fa-camera-retro', 'fa-ticket'];
+    const DEFAULT_GENRES = ['Drama'];
+    const WIKIDATA_ENDPOINT = 'https://query.wikidata.org/sparql';
+
+    function slugify(value) {
+      return String(value || '')
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 80) || `loc-${Math.random().toString(36).slice(2, 10)}`;
+    }
+
+    function hashString(value) {
+      return [...String(value || '')].reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+    }
+
+    function pickMarkerIcon(seed) {
+      return MOVIE_ICONS[hashString(seed) % MOVIE_ICONS.length];
+    }
+
+    function guessRegionFromLabel(label) {
+      const s = String(label || '').toLowerCase();
+      if (s.includes('brussels') || s.includes('bruxelles')) return 'brussels';
+      const flandersHints = ['bruges', 'brugge', 'ghent', 'gent', 'antwerp', 'anvers', 'leuven', 'limburg', 'ostend', 'oostende', 'mechelen', 'kortrijk', 'ieper', 'ypres'];
+      if (flandersHints.some(h => s.includes(h))) return 'flanders';
+      const walloniaHints = ['liege', 'liège', 'namur', 'mons', 'charleroi', 'spa', 'dinant', 'seraing', 'ardennes', 'luxembourg', 'tournai'];
+      if (walloniaHints.some(h => s.includes(h))) return 'wallonia';
+      return 'belgium';
+    }
+
+    function normalizeRegionKey(region) {
+      const r = String(region || '').toLowerCase().trim();
+      if (['flanders', 'vlaanderen', 'flemish', 'flemish region'].includes(r)) return 'flanders';
+      if (['brussels', 'bruxelles', 'brussels-capital', 'bruxelles-capitale'].includes(r)) return 'brussels';
+      if (['wallonia', 'wallonie', 'walloon', 'walloon region'].includes(r)) return 'wallonia';
+      return null;
+    }
+
+    function inferRegionFromLocation(loc) {
+      const explicit = normalizeRegionKey(loc?.region);
+      if (explicit) return explicit;
+
+      const labelGuess = normalizeRegionKey(guessRegionFromLabel(`${loc?.locationName || ''} ${loc?.city || ''}`));
+      if (labelGuess) return labelGuess;
+
+      const lat = Number(loc?.lat);
+      const lng = Number(loc?.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+      // Lightweight geographic fallback for Belgium. This is intentionally broad:
+      // it prevents dynamic/imported locations with missing region values from
+      // failing the My Journey region-lighting calculation.
+      if (lat >= 50.76 && lat <= 50.92 && lng >= 4.24 && lng <= 4.48) return 'brussels';
+      if (lat >= 50.70) return 'flanders';
+      return 'wallonia';
+    }
+
+    async function fetchTmdbFullDetails(tmdbId) {
+      if (!tmdbId) return null;
+      if (tmdbCache[tmdbId]?.full) return tmdbCache[tmdbId].full;
+      try {
+        const res = await fetch(`https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${TMDB_API_KEY}&language=en-US`);
+        if (!res.ok) throw new Error('TMDB full fetch failed');
+        const data = await res.json();
+        const result = {
+          id: data.id,
+          title: data.title,
+          year: data.release_date ? Number(data.release_date.split('-')[0]) : null,
+          posterUrl: data.poster_path ? `${TMDB_IMG_BASE}${data.poster_path}` : null,
+          backdropUrl: data.backdrop_path ? `https://image.tmdb.org/t/p/w780${data.backdrop_path}` : null,
+          overview: data.overview || '',
+          rating: Number.isFinite(data.vote_average) ? data.vote_average : null,
+          genres: Array.isArray(data.genres) && data.genres.length ? data.genres.map(g => g.name) : DEFAULT_GENRES,
+          imdbId: data.imdb_id || null,
+        };
+        tmdbCache[tmdbId] = { ...(tmdbCache[tmdbId] || {}), full: result };
+        return result;
+      } catch (e) {
+        console.warn('TMDB full details error:', e);
+        return null;
+      }
+    }
+
+    function mergeLocations(seedLocations, dynamicLocations) {
+      const byId = new Map(seedLocations.map(loc => [loc.id, loc]));
+      const dedupeKeys = new Set(seedLocations.map(loc => `${loc.filmTitle}|${loc.locationName}|${loc.lat.toFixed(4)}|${loc.lng.toFixed(4)}`));
+      for (const loc of dynamicLocations) {
+        const key = `${loc.filmTitle}|${loc.locationName}|${loc.lat.toFixed(4)}|${loc.lng.toFixed(4)}`;
+        if (dedupeKeys.has(key)) continue;
+        dedupeKeys.add(key);
+        byId.set(loc.id, loc);
+      }
+      return [...byId.values()].sort((a, b) => a.filmTitle.localeCompare(b.filmTitle) || a.locationName.localeCompare(b.locationName));
+    }
+
+    async function fetchWikidataMovieLocations(limit = 100) {
+      const sparql = `
+        SELECT ?movieLabel ?tmdbId ?locationLabel ?coords WHERE {
+          ?movie wdt:P31 wd:Q11424;
+                 wdt:P915 ?location;
+                 wdt:P4947 ?tmdbId.
+          ?location wdt:P17 wd:Q31;
+                    wdt:P625 ?coords.
+          SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+        }
+        LIMIT ${limit}`;
+
+      const res = await fetch(`${WIKIDATA_ENDPOINT}?format=json&query=${encodeURIComponent(sparql)}`, {
+        headers: {
+          'Accept': 'application/sparql-results+json'
+        }
+      });
+      if (!res.ok) throw new Error('Wikidata fetch failed');
+      const data = await res.json();
+      const items = data?.results?.bindings || [];
+
+      const mapped = await Promise.all(items.map(async (item, index) => {
+        const coords = item.coords?.value?.match(/-?\d+\.\d+/g);
+        if (!coords || coords.length < 2) return null;
+        const lat = parseFloat(coords[1]);
+        const lng = parseFloat(coords[0]);
+        const filmTitle = item.movieLabel?.value || 'Unknown film';
+        const locationName = item.locationLabel?.value || 'Unknown location';
+        const tmdbId = Number(item.tmdbId?.value || 0) || null;
+        const tmdb = await fetchTmdbFullDetails(tmdbId);
+        const year = tmdb?.year || null;
+        const safeFilmSlug = slugify(filmTitle);
+        const safeLocationSlug = slugify(locationName);
+        const cityGuess = locationName.split(',')[0].trim();
+        return {
+          id: `${safeFilmSlug}-${safeLocationSlug}-${index}`,
+          filmTitle,
+          year: year || 'Unknown',
+          director: tmdb?.director || '',
+          imdbRating: tmdb?.rating || 0,
+          imdbId: tmdb?.imdbId || null,
+          tmdbId,
+          genres: tmdb?.genres || DEFAULT_GENRES,
+          posterUrl: tmdb?.posterUrl || null,
+          movieStillUrl: tmdb?.backdropUrl || tmdb?.posterUrl || null,
+          lat,
+          lng,
+          locationName,
+          city: cityGuess,
+          region: guessRegionFromLabel(locationName),
+          locationDescription: tmdb?.overview ? `${tmdb.overview.slice(0, 150)}...` : 'Filming location collected from Wikidata and enriched with TMDB metadata.',
+          checkedIn: false,
+          userPhoto: null,
+          checkInDate: null,
+          trivia: `Imported filming location for ${filmTitle}. Data source: Wikidata filming location property with TMDB enrichment.`,
+          markerIcon: pickMarkerIcon(filmTitle),
+        };
+      }));
+
+      return mapped.filter(Boolean);
+    }
+
+    async function hydrateDynamicLocations() {
+      try {
+        const dynamicLocations = await fetchWikidataMovieLocations();
+        LOCATIONS = dynamicLocations.length ? mergeLocations(SEED_LOCATIONS, dynamicLocations) : [...SEED_LOCATIONS];
+      } catch (e) {
+        console.warn('Dynamic sync failed, using seed dataset only:', e);
+        LOCATIONS = [...SEED_LOCATIONS];
+      }
+      loadState();
+    }
+
+    // ============ STATE ============
+    let earnedBadges = new Set();
+    let answeredQuizzes = new Set();
+
+    // Load saved state
+    function loadState() {
+      try {
+        const saved = localStorage.getItem('cinespot_state_v2');
+        if (saved) {
+          const state = JSON.parse(saved);
+          LOCATIONS.forEach(loc => {
+            const s = state.locations?.[loc.id];
+            if (s) {
+              loc.checkedIn = s.checkedIn || false;
+              loc.userPhoto = s.userPhoto || null;
+              loc.checkInDate = s.checkInDate || null;
+            }
+          });
+          if (state.badges) earnedBadges = new Set(state.badges);
+          if (state.quizzes) answeredQuizzes = new Set(state.quizzes);
+        }
+      } catch(e) { /* ignore */ }
+    }
+
+    function saveState() {
+      const state = { locations: {}, badges: [...earnedBadges], quizzes: [...answeredQuizzes] };
+      LOCATIONS.forEach(loc => {
+        state.locations[loc.id] = {
+          checkedIn: loc.checkedIn,
+          userPhoto: loc.userPhoto,
+          checkInDate: loc.checkInDate
+        };
+      });
+      localStorage.setItem('cinespot_state_v2', JSON.stringify(state));
+    }
+
+    // ============ MAP ============
+    let map, markers = {}, activeMarkerId = null;
+
+    function isValidLocation(loc) {
+      return loc && Number.isFinite(Number(loc.lat)) && Number.isFinite(Number(loc.lng)) && Math.abs(Number(loc.lat)) <= 90 && Math.abs(Number(loc.lng)) <= 180;
+    }
+
+    function initMap() {
+      const validLocations = LOCATIONS.filter(isValidLocation);
+      if (!validLocations.length) {
+        throw new Error('No valid locations available for map rendering');
+      }
+
+      map = L.map('map', {
+        center: [50.5039, 4.4699],
+        zoom: 8,
+        minZoom: 7,
+        maxZoom: 18,
+        zoomControl: false,
+      });
+
+      // Light basemap styled in grayscale for a black-and-white linework look
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        crossOrigin: true,
+      }).addTo(map);
+
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+      validLocations.forEach(loc => {
+        try {
+          addMarker(loc);
+        } catch (e) {
+          console.warn('Skipping invalid marker:', loc, e);
+        }
+      });
+
+      // Dynamic status bar updates on map move
+      map.on('moveend zoomend', updateStatusBar);
+      updateStatusBar();
+    }
+
+
+    function rebuildMapMarkers() {
+      if (!map) return;
+
+      Object.values(markers).forEach(marker => {
+        try {
+          if (map.hasLayer(marker)) map.removeLayer(marker);
+        } catch (e) {
+          console.warn('Could not remove marker during rebuild:', e);
+        }
+      });
+
+      markers = {};
+      activeMarkerId = null;
+
+      LOCATIONS.filter(isValidLocation).forEach(loc => {
+        try {
+          addMarker(loc);
+        } catch (e) {
+          console.warn('Skipping invalid marker during rebuild:', loc, e);
+        }
+      });
+
+      try { applyMapFilter(); } catch (e) { /* applyMapFilter is UI-only; do not block map rendering */ }
+      try { buildDrawer(); } catch (e) { /* drawer can refresh later */ }
+      setTimeout(() => map.invalidateSize({ animate: false }), 80);
+    }
+
+    function createMarkerIcon(loc, isActive) {
+      const activeClass = isActive ? ' active' : '';
+      const iconHtml = loc.checkedIn
+        ? `<div class="cine-glow-dot${activeClass}"></div>`
+        : `<div class="cine-marker-icon${activeClass}"><i class="fa-solid fa-film" aria-hidden="true"></i></div>`;
+
+      return L.divIcon({
+        html: `<div class="cine-marker-wrapper">${iconHtml}</div>`,
+        className: '',
+        iconSize: loc.checkedIn ? [20, 20] : [40, 40],
+        iconAnchor: loc.checkedIn ? [10, 10] : [20, 20],
+      });
+    }
+
+    function addMarker(loc) {
+      const marker = L.marker([loc.lat, loc.lng], {
+        icon: createMarkerIcon(loc, false),
+      });
+      marker.on('click', () => openPanel(loc));
+      marker.addTo(map);
+      markers[loc.id] = marker;
+    }
+
+    function setActiveMarker(id) {
+      if (activeMarkerId && markers[activeMarkerId]) {
+        const prevLoc = LOCATIONS.find(l => l.id === activeMarkerId);
+        if (prevLoc) markers[activeMarkerId].setIcon(createMarkerIcon(prevLoc, false));
+      }
+      activeMarkerId = id;
+      if (id && markers[id]) {
+        const loc = LOCATIONS.find(l => l.id === id);
+        if (loc) markers[id].setIcon(createMarkerIcon(loc, true));
+      }
+    }
+
+    function refreshMarkerIcon(loc) {
+      const marker = markers[loc.id];
+      if (!marker) return;
+      const icon = createMarkerIcon(loc, loc.id === activeMarkerId);
+      marker.setIcon(icon);
+      requestAnimationFrame(() => {
+        if (marker._icon) marker._icon.innerHTML = icon.options.html;
+      });
+    }
+
+    function animateCheckedInMarker(locId) {
+      const marker = markers[locId];
+      if (!marker || !marker._icon) return;
+      const iconEl = marker._icon.querySelector('.cine-glow-dot');
+      if (!iconEl) return;
+      iconEl.classList.remove('just-checked-in');
+      void iconEl.offsetWidth;
+      iconEl.classList.add('just-checked-in');
+    }
+
+    // Update drawer subtitle counts (status bar removed)
+    function updateStatusBar() {
+      if (!map) return;
+      // Refresh drawer subtitle if drawer is open
+      const drawer = document.getElementById('locationsDrawer');
+      if (drawer && drawer.classList.contains('open')) {
+        buildDrawer();
+      }
+    }
+
+    // ============ TMDB API ============
+    const tmdbCache = {};
+
+    async function fetchTmdbData(tmdbId) {
+      if (tmdbCache[tmdbId]) return tmdbCache[tmdbId];
+      try {
+        const res = await fetch(`https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${TMDB_API_KEY}&language=en-US`);
+        if (!res.ok) throw new Error('TMDB fetch failed');
+        const data = await res.json();
+        const result = {
+          posterUrl: data.poster_path ? `${TMDB_IMG_BASE}${data.poster_path}` : null,
+          backdropUrl: data.backdrop_path ? `https://image.tmdb.org/t/p/w780${data.backdrop_path}` : null,
+          overview: data.overview,
+          rating: data.vote_average,
+        };
+        tmdbCache[tmdbId] = result;
+        return result;
+      } catch(e) {
+        console.warn('TMDB error:', e);
+        return null;
+      }
+    }
+
+    // ============ RIGHT PANEL ============
+    let currentLocation = null;
+
+    async function openPanel(loc) {
+      currentLocation = loc;
+      const panel = document.getElementById('rightPanel');
+
+      const posterPlaceholder = document.getElementById('posterPlaceholder');
+      const posterImg = document.getElementById('posterImg');
+      const posterTitle = document.getElementById('posterTitle');
+
+      const showPoster = (url) => {
+        if (!url) {
+          posterImg.removeAttribute('src');
+          posterImg.style.display = 'none';
+          posterPlaceholder.style.display = 'flex';
+          return false;
+        }
+        posterImg.onload = () => {
+          posterImg.style.display = 'block';
+          posterPlaceholder.style.display = 'none';
+        };
+        posterImg.onerror = () => {
+          posterImg.removeAttribute('src');
+          posterImg.style.display = 'none';
+          posterPlaceholder.style.display = 'flex';
+        };
+        posterImg.alt = loc.filmTitle;
+        posterImg.src = url;
+        return true;
+      };
+
+      posterImg.onload = null;
+      posterImg.onerror = null;
+      posterImg.style.display = 'none';
+      posterPlaceholder.style.display = 'flex';
+      posterTitle.textContent = loc.filmTitle;
+      showPoster(loc.posterUrl || loc.movieStillUrl || '');
+
+      // Film info
+      document.getElementById('panelTitle').textContent = loc.filmTitle;
+      document.getElementById('panelMeta').textContent = `${loc.year}  ·  ${loc.director}`;
+      document.getElementById('panelScore').textContent = loc.imdbRating.toFixed(1);
+      document.getElementById('panelSynopsis').textContent = '';
+      document.getElementById('panelGenres').innerHTML = loc.genres.map(g => `<span class="genre-tag">${g}</span>`).join('');
+      document.getElementById('panelImdb').href = loc.imdbId ? `https://www.imdb.com/title/${loc.imdbId}/` : `https://www.themoviedb.org/movie/${loc.tmdbId}`;
+
+      const filmLocs = [loc]; // only show the clicked location
+      const locsEl = document.getElementById('panelLocations');
+      locsEl.innerHTML = filmLocs.map(fl => {
+        const gmapsEmbedUrl = `https://www.google.com/maps?q=${fl.lat},${fl.lng}&z=17&output=embed`;
+        return `
+        <div class="location-card">
+          <div class="location-card-header">
+            <div>
+              <div class="location-name">${fl.locationName}</div>
+              <div class="location-note">${fl.locationDescription}</div>
+            </div>
+            <button class="location-nav-btn" onclick="window.CINE.navigate(${fl.lat}, ${fl.lng})" title="Navigate">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+              </svg>
+              <span class="tooltip">Navigate via Google Maps</span>
+            </button>
+          </div>
+          <div class="location-streetview">
+            <iframe
+              src="${gmapsEmbedUrl}"
+              width="100%" height="100%"
+              style="border:0;filter:saturate(0.6) brightness(0.85);"
+              allowfullscreen="" loading="lazy"
+              referrerpolicy="no-referrer-when-downgrade"
+              onerror="this.parentElement.innerHTML='<div style=\'padding:20px;text-align:center;color:var(--text-muted);font-size:12px\'>Map preview unavailable</div>'"
+            ></iframe>
+          </div>
+        </div>`;
+      }).join('');
+
+      renderCheckin(loc);
+      renderPhoto(loc);
+
+      panel.classList.add('open');
+      setActiveMarker(loc.id);
+      map.flyTo([loc.lat, loc.lng], 14, { duration: 1.2 });
+
+      if (loc.tmdbId) {
+        const tmdbData = await fetchTmdbData(loc.tmdbId);
+        if (tmdbData) {
+          const displayUrl = tmdbData.posterUrl || tmdbData.backdropUrl || loc.movieStillUrl || '';
+          if (tmdbData.posterUrl) loc.posterUrl = tmdbData.posterUrl;
+          showPoster(displayUrl);
+          if (tmdbData.overview) {
+            document.getElementById('panelSynopsis').textContent = tmdbData.overview;
+          }
+        }
+      }
+    }
+
+    function closePanel() {
+      document.getElementById('rightPanel').classList.remove('open');
+      setActiveMarker(null);
+      currentLocation = null;
+    }
+
+    function renderCheckin(loc) {
+      const section = document.getElementById('checkinSection');
+      if (loc.checkedIn) {
+        section.innerHTML = `
+          <div class="checkin-done">
+            <div class="checkin-done-label">Location Stamped</div>
+            <div class="checkin-done-date">Checked in ${loc.checkInDate || ''}</div>
+          </div>
+          <a class="journey-link" onclick="window.CINE.switchTab('journey')">View My Journey &rarr;</a>
+        `;
+      } else {
+        section.innerHTML = `
+          <button class="checkin-btn" onclick="window.CINE.checkIn('${loc.id}')">Check In Here</button>
+        `;
+      }
+    }
+
+    // Photo comparison section — top/bottom stacked
+    function renderPhoto(loc) {
+      const section = document.getElementById('photoSection');
+      const stillUrl = loc.movieStillUrl || loc.posterUrl;
+
+      // Unified filming-location placeholder SVG — white background, dark strokes
+      const placeholderSVG = `<svg width="52" height="40" viewBox="0 0 52 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="50" height="38" rx="2" stroke="#B0ABA3" stroke-width="1.2"/>
+        <circle cx="16" cy="15" r="5" stroke="#B0ABA3" stroke-width="1.2"/>
+        <path d="M1 29 L14 20 L23 27 L33 17 L51 31" stroke="#B0ABA3" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"/>
+        <rect x="35" y="6" width="11" height="8" rx="1.5" stroke="#B0ABA3" stroke-width="1"/>
+        <path d="M46 9.5 L51 7 L51 13 L46 10.5" stroke="#B0ABA3" stroke-width="1" stroke-linejoin="round"/>
+      </svg>`;
+
+      // Top row: show the movie still / scene reference when available, then fall back to the unified placeholder.
+      const stillPlaceholder = `<div class="photo-stack-placeholder">
+             ${placeholderSVG}
+             <span class="photo-stack-placeholder-text">Filming Location</span>
+           </div>`;
+      const topRow = stillUrl
+        ? `<div class="photo-stack-row">
+             <img src="${escapeHtml(stillUrl)}" alt="Movie still from ${escapeHtml(loc.filmTitle)}" loading="lazy" onerror="this.parentElement.outerHTML = this.parentElement.dataset.fallback" data-fallback="${escapeHtml(stillPlaceholder)}">
+             <span class="photo-stack-label">Movie Still</span>
+           </div>`
+        : stillPlaceholder;
+
+      const uploadId = `ul-${loc.id}`;
+
+      if (loc.userPhoto) {
+        section.innerHTML = `
+          <div class="section-label">Your Visit</div>
+          <div class="photo-stacked">
+            ${topRow}
+            <div class="photo-stack-divider"></div>
+            <div class="photo-stack-row">
+              <img src="${loc.userPhoto}" alt="Your photo">
+              <span class="photo-stack-label">Your Photo</span>
+            </div>
+            <div class="photo-stack-divider"></div>
+            <div class="inline-upload" id="${uploadId}">
+              <input type="file" accept="image/*">
+              <div class="inline-upload-drag">Replace photo</div>
+              <span class="inline-upload-btn">Choose File</span>
+            </div>
+          </div>`;
+      } else {
+        section.innerHTML = `
+          <div class="section-label">Your Visit</div>
+          <div class="photo-stacked">
+            ${topRow}
+            <div class="photo-stack-divider"></div>
+            <div class="inline-upload" id="${uploadId}">
+              <input type="file" accept="image/*">
+              <div class="inline-upload-title">The scene is waiting for you.</div>
+              <div class="inline-upload-drag">Drag a photo here, or</div>
+              <span class="inline-upload-btn">Choose File</span>
+            </div>
+          </div>`;
+      }
+
+      // Bind the whole upload div — file input covers it, drag events on the div
+      const uploadDiv = document.getElementById(uploadId);
+      if (uploadDiv) {
+        const fileInput = uploadDiv.querySelector('input[type="file"]');
+        fileInput.addEventListener('change', (e) => {
+          if (e.target.files[0]) handleFileUpload(e.target.files[0]);
+        });
+        uploadDiv.addEventListener('dragover', (e) => { e.preventDefault(); uploadDiv.classList.add('dragover'); });
+        uploadDiv.addEventListener('dragleave', () => uploadDiv.classList.remove('dragover'));
+        uploadDiv.addEventListener('drop', (e) => {
+          e.preventDefault();
+          uploadDiv.classList.remove('dragover');
+          if (e.dataTransfer.files[0]) handleFileUpload(e.dataTransfer.files[0]);
+        });
+      }
+    }
+
+    // ============ CHECK-IN ============
+    function checkIn(locId) {
+      const loc = LOCATIONS.find(l => l.id === locId);
+      if (!loc || loc.checkedIn) return;
+
+      const now = new Date();
+      loc.checkedIn = true;
+      loc.checkInDate = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      saveState();
+
+      // Show stamp animation
+      const overlay = document.getElementById('stampOverlay');
+      document.getElementById('stampLocation').textContent = loc.locationName;
+      document.getElementById('stampDate').textContent = loc.checkInDate;
+      overlay.classList.add('active');
+
+      // Update marker to checked-in style
+      refreshMarkerIcon(loc);
+      setTimeout(() => animateCheckedInMarker(loc.id), 20);
+
+      // Update panel
+      renderCheckin(loc);
+
+      // Check achievements
+      const checkedCount = LOCATIONS.filter(l => l.checkedIn).length;
+      if (checkedCount === 5) {
+        setTimeout(() => showAchievement('Cinephile Unlocked', 'You\'ve visited 5 filming locations'), 2500);
+      } else if (checkedCount === LOCATIONS.length) {
+        setTimeout(() => showAchievement('Belgian Cinema Master', 'Every location discovered'), 2500);
+      }
+
+      // Photo upload badge
+      if (loc.userPhoto && !earnedBadges.has('photographer')) {
+        earnedBadges.add('photographer');
+        saveState();
+      }
+    }
+
+    function closeStamp() {
+      document.getElementById('stampOverlay').classList.remove('active');
+    }
+
+    function showAchievement(title, sub) {
+      const toast = document.getElementById('achievementToast');
+      document.getElementById('achievementTitle').textContent = title;
+      document.getElementById('achievementSub').textContent = sub;
+      toast.classList.add('active');
+      setTimeout(() => toast.classList.remove('active'), 3000);
+    }
+
+    // ============ PHOTO UPLOAD ============
+    function openUpload() {
+      document.getElementById('uploadModal').classList.add('active');
+    }
+    function closeUpload() {
+      document.getElementById('uploadModal').classList.remove('active');
+    }
+    function handleFileUpload(file) {
+      if (!file || !currentLocation) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        currentLocation.userPhoto = e.target.result;
+        saveState();
+        renderPhoto(currentLocation);
+        closeUpload();
+        // Photographer badge
+        if (!earnedBadges.has('photographer')) {
+          earnedBadges.add('photographer');
+          saveState();
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // ============ SEARCH ============
+    function initSearch() {
+      const input = document.getElementById('searchInput');
+      const dropdown = document.getElementById('searchDropdown');
+
+      input.addEventListener('input', () => {
+        const q = input.value.trim().toLowerCase();
+        if (q.length < 2) { dropdown.classList.remove('active'); return; }
+
+        const results = [];
+        const seenFilms = new Set();
+        const seenDirs = new Set();
+
+        LOCATIONS.forEach(loc => {
+          if (!seenFilms.has(loc.filmTitle) && loc.filmTitle.toLowerCase().includes(q)) {
+            seenFilms.add(loc.filmTitle);
+            results.push({ type: 'Film', label: loc.filmTitle, loc });
+          }
+          if (!seenDirs.has(loc.director) && loc.director.toLowerCase().includes(q)) {
+            seenDirs.add(loc.director);
+            results.push({ type: 'Director', label: loc.director, loc });
+          }
+          if (loc.locationName.toLowerCase().includes(q)) {
+            results.push({ type: 'Location', label: loc.locationName, loc });
+          }
+        });
+
+        if (results.length === 0) { dropdown.classList.remove('active'); return; }
+
+        dropdown.innerHTML = results.slice(0, 8).map((r, i) => `
+          <div class="search-item" data-idx="${i}">
+            <span class="search-item-type">${r.type}</span>
+            <span class="search-item-label">${r.label}</span>
+          </div>
+        `).join('');
+        dropdown.classList.add('active');
+
+        dropdown.querySelectorAll('.search-item').forEach((el, i) => {
+          el.addEventListener('click', () => {
+            openPanel(results[i].loc);
+            dropdown.classList.remove('active');
+            input.value = '';
+          });
+        });
+      });
+
+      input.addEventListener('blur', () => {
+        setTimeout(() => dropdown.classList.remove('active'), 200);
+      });
+    }
+
+    // ============ TABS ============
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+      });
+
+      const journeyView = document.getElementById('journeyView');
+      const aboutView = document.getElementById('aboutView');
+      const mapContainer = document.getElementById('mapContainer');
+
+      journeyView.classList.toggle('active', tab === 'journey');
+      aboutView.classList.toggle('active', tab === 'about');
+
+      // Use explicit display values so the Map tab is always restored after leaving My Journey.
+      mapContainer.style.display = tab === 'map' ? 'block' : 'none';
+
+      // Hide search bar on journey tab
+      document.querySelector('.search-container').style.display = tab === 'journey' ? 'none' : '';
+      // Hide filter chips and open btn on non-map tabs
+      document.getElementById('navFilterChips').style.display = tab === 'map' ? '' : 'none';
+      document.getElementById('panelOpenBtn').style.display = tab === 'map' ? '' : 'none';
+
+      if (tab !== 'map') closePanel();
+
+      // Stop My Journey-only animation and overlays whenever the user leaves that tab.
+      if (tab !== 'journey') {
+        stopJourneyPulse();
+        if (_journeyTl) { _journeyTl.kill(); _journeyTl = null; }
+        journeyView.querySelectorAll('.neon-city-label').forEach(el => el.remove());
+      }
+
+      closeStamp();
+
+      if (tab === 'journey') renderJourney();
+      if (tab === 'map' && map) {
+        setTimeout(() => map.invalidateSize({ animate: false }), 120);
+      }
+    }
+
+    // ============ MY JOURNEY — NEON CANVAS ============
+
+    // Geo coordinates to canvas pixel mapping
+    const GEO_BOUNDS = { minLat: 49.4, maxLat: 51.6, minLng: 2.3, maxLng: 6.6 };
+    // Inlined Belgium provinces GeoJSON (works without server)
+    const _provincesGeoJSON = {"type":"FeatureCollection","features":[{"type":"Feature","properties":{"name":"Bruxelles","region":"Bruxelles"},"geometry":{"type":"MultiPolygon","coordinates":[[[[4.404,50.774],[4.375,50.767],[4.372,50.768],[4.371,50.771],[4.368,50.772],[4.321,50.776],[4.324,50.786],[4.323,50.789],[4.308,50.801],[4.3,50.802],[4.299,50.807],[4.277,50.809],[4.269,50.812],[4.258,50.813],[4.254,50.818],[4.244,50.82],[4.244,50.822],[4.253,50.828],[4.257,50.836],[4.27,50.837],[4.283,50.842],[4.287,50.855],[4.281,50.86],[4.28,50.864],[4.295,50.876],[4.304,50.88],[4.298,50.887],[4.299,50.889],[4.302,50.89],[4.304,50.895],[4.322,50.894],[4.342,50.901],[4.359,50.901],[4.372,50.898],[4.398,50.91],[4.422,50.91],[4.428,50.901],[4.429,50.896],[4.432,50.893],[4.428,50.888],[4.436,50.879],[4.435,50.877],[4.425,50.873],[4.423,50.866],[4.424,50.861],[4.432,50.86],[4.447,50.853],[4.453,50.848],[4.459,50.838],[4.46,50.829],[4.456,50.819],[4.448,50.817],[4.444,50.811],[4.447,50.807],[4.469,50.797],[4.472,50.795],[4.468,50.791],[4.455,50.788],[4.455,50.783],[4.433,50.78],[4.413,50.773],[4.404,50.774]]]]}},{"type":"Feature","properties":{"name":"Antwerpen","region":"Vlaanderen"},"geometry":{"type":"MultiPolygon","coordinates":[[[[4.771,51.04],[4.74,51.027],[4.718,51.008],[4.705,51.018],[4.689,51.025],[4.638,51.024],[4.618,51.013],[4.602,50.998],[4.534,51.008],[4.501,51.016],[4.488,50.999],[4.455,51.004],[4.398,51.006],[4.387,51.025],[4.375,51.029],[4.322,51.034],[4.293,51.045],[4.254,51.042],[4.219,51.038],[4.194,51.049],[4.188,51.077],[4.173,51.095],[4.179,51.107],[4.213,51.125],[4.261,51.123],[4.318,51.128],[4.327,51.199],[4.302,51.233],[4.294,51.263],[4.305,51.284],[4.28,51.297],[4.271,51.311],[4.267,51.331],[4.231,51.358],[4.222,51.366],[4.221,51.376],[4.281,51.38],[4.346,51.361],[4.422,51.367],[4.425,51.386],[4.392,51.417],[4.409,51.459],[4.467,51.477],[4.493,51.48],[4.552,51.472],[4.537,51.424],[4.614,51.428],[4.641,51.424],[4.663,51.427],[4.677,51.438],[4.707,51.456],[4.719,51.468],[4.737,51.487],[4.779,51.504],[4.839,51.48],[4.829,51.44],[4.811,51.425],[4.773,51.429],[4.798,51.41],[4.885,51.416],[4.936,51.398],[4.971,51.42],[5.017,51.455],[5.018,51.471],[5.037,51.485],[5.082,51.467],[5.098,51.428],[5.076,51.395],[5.137,51.316],[5.181,51.321],[5.233,51.313],[5.238,51.288],[5.23,51.267],[5.228,51.246],[5.233,51.211],[5.257,51.198],[5.274,51.164],[5.258,51.143],[5.209,51.133],[5.146,51.123],[5.125,51.107],[5.077,51.084],[5.029,51.076],[5.0,51.05],[4.966,51.047],[4.913,51.041],[4.861,51.019],[4.829,51.019],[4.783,51.044],[4.771,51.04]]],[[[4.962,51.447],[4.953,51.444],[4.951,51.44],[4.952,51.431],[4.945,51.429],[4.929,51.432],[4.927,51.438],[4.928,51.448],[4.931,51.45],[4.937,51.452],[4.944,51.45],[4.963,51.454],[4.968,51.449],[4.962,51.447]]]]}},{"type":"Feature","properties":{"name":"Limburg","region":"Vlaanderen"},"geometry":{"type":"MultiPolygon","coordinates":[[[[5.382,50.743],[5.324,50.728],[5.26,50.717],[5.21,50.722],[5.178,50.707],[5.143,50.706],[5.113,50.732],[5.105,50.758],[5.114,50.778],[5.14,50.797],[5.139,50.824],[5.159,50.867],[5.191,50.886],[5.19,50.908],[5.112,50.912],[5.065,50.919],[5.05,50.939],[5.078,50.954],[5.077,50.977],[5.125,50.997],[5.149,51.016],[5.136,51.049],[5.092,51.048],[5.072,51.026],[5.017,51.034],[5.0,51.05],[5.033,51.077],[5.101,51.087],[5.146,51.123],[5.218,51.139],[5.274,51.164],[5.247,51.205],[5.227,51.227],[5.265,51.267],[5.358,51.273],[5.442,51.274],[5.489,51.297],[5.551,51.267],[5.652,51.2],[5.723,51.182],[5.783,51.181],[5.781,51.17],[5.822,51.163],[5.834,51.169],[5.844,51.135],[5.816,51.115],[5.836,51.104],[5.811,51.096],[5.806,51.081],[5.796,51.062],[5.764,51.033],[5.768,51.014],[5.763,50.992],[5.731,50.956],[5.757,50.956],[5.728,50.915],[5.704,50.906],[5.67,50.88],[5.647,50.852],[5.66,50.822],[5.678,50.805],[5.599,50.768],[5.538,50.755],[5.5,50.732],[5.454,50.715],[5.41,50.722],[5.405,50.745],[5.382,50.743]]],[[[5.785,50.736],[5.765,50.738],[5.739,50.745],[5.72,50.741],[5.707,50.741],[5.699,50.746],[5.693,50.755],[5.692,50.76],[5.695,50.758],[5.707,50.763],[5.732,50.763],[5.755,50.779],[5.761,50.779],[5.773,50.785],[5.783,50.78],[5.791,50.77],[5.793,50.77],[5.813,50.76],[5.833,50.764],[5.856,50.761],[5.881,50.769],[5.896,50.76],[5.885,50.739],[5.888,50.726],[5.887,50.712],[5.856,50.711],[5.827,50.716],[5.805,50.718],[5.795,50.73],[5.785,50.736]]]]}},{"type":"Feature","properties":{"name":"Oost-Vlaanderen","region":"Vlaanderen"},"geometry":{"type":"MultiPolygon","coordinates":[[[[3.663,50.736],[3.575,50.73],[3.549,50.76],[3.493,50.759],[3.518,50.795],[3.512,50.811],[3.496,50.855],[3.478,50.897],[3.45,50.904],[3.432,50.911],[3.445,50.93],[3.436,50.957],[3.441,50.983],[3.449,50.997],[3.445,51.025],[3.446,51.055],[3.379,51.084],[3.341,51.101],[3.405,51.148],[3.397,51.179],[3.391,51.212],[3.385,51.229],[3.404,51.249],[3.389,51.262],[3.399,51.27],[3.43,51.25],[3.506,51.247],[3.527,51.292],[3.552,51.292],[3.574,51.292],[3.592,51.308],[3.694,51.283],[3.735,51.274],[3.765,51.265],[3.799,51.258],[3.789,51.215],[3.884,51.201],[3.962,51.216],[4.104,51.268],[4.237,51.351],[4.267,51.331],[4.279,51.298],[4.304,51.277],[4.302,51.233],[4.326,51.138],[4.261,51.123],[4.204,51.122],[4.173,51.097],[4.194,51.061],[4.219,51.038],[4.237,51.008],[4.211,50.988],[4.15,50.974],[4.17,50.943],[4.12,50.933],[4.098,50.916],[4.081,50.904],[4.082,50.873],[4.054,50.84],[4.077,50.832],[4.074,50.804],[4.026,50.774],[3.976,50.773],[3.943,50.773],[3.928,50.752],[3.949,50.737],[3.884,50.737],[3.853,50.747],[3.801,50.745],[3.749,50.766],[3.69,50.767],[3.663,50.736]]]]}},{"type":"Feature","properties":{"name":"VlaamsBrabant","region":"Vlaanderen"},"geometry":{"type":"MultiPolygon","coordinates":[[[[3.927,50.733],[3.928,50.752],[3.96,50.778],[4.008,50.775],[4.074,50.804],[4.057,50.834],[4.074,50.859],[4.081,50.904],[4.099,50.932],[4.16,50.935],[4.15,50.974],[4.226,50.995],[4.244,51.043],[4.307,51.042],[4.387,51.025],[4.455,51.004],[4.501,51.016],[4.602,50.998],[4.638,51.024],[4.705,51.018],[4.74,51.027],[4.811,51.035],[4.88,51.025],[4.995,51.041],[5.089,51.031],[5.105,51.052],[5.166,51.025],[5.125,50.997],[5.084,50.966],[5.052,50.945],[5.079,50.918],[5.19,50.908],[5.178,50.877],[5.144,50.836],[5.14,50.797],[5.115,50.772],[5.108,50.738],[5.092,50.708],[5.055,50.726],[5.026,50.748],[4.993,50.765],[4.956,50.754],[4.872,50.743],[4.841,50.764],[4.807,50.782],[4.76,50.803],[4.683,50.788],[4.649,50.76],[4.615,50.75],[4.58,50.756],[4.522,50.73],[4.485,50.753],[4.443,50.738],[4.375,50.728],[4.344,50.724],[4.316,50.712],[4.235,50.691],[4.137,50.721],[4.087,50.709],[3.991,50.691],[3.88,50.719],[3.927,50.733]],[[4.412,50.909],[4.396,50.909],[4.372,50.898],[4.359,50.901],[4.342,50.901],[4.322,50.894],[4.304,50.895],[4.302,50.89],[4.299,50.889],[4.298,50.887],[4.304,50.88],[4.295,50.876],[4.28,50.864],[4.281,50.86],[4.287,50.855],[4.283,50.842],[4.27,50.837],[4.257,50.836],[4.254,50.83],[4.245,50.824],[4.244,50.82],[4.254,50.818],[4.258,50.813],[4.269,50.812],[4.277,50.809],[4.299,50.807],[4.3,50.802],[4.308,50.801],[4.323,50.789],[4.324,50.786],[4.321,50.776],[4.368,50.772],[4.372,50.771],[4.372,50.768],[4.377,50.767],[4.403,50.774],[4.413,50.773],[4.433,50.78],[4.455,50.783],[4.455,50.788],[4.468,50.791],[4.472,50.795],[4.469,50.797],[4.447,50.807],[4.444,50.811],[4.448,50.817],[4.456,50.819],[4.458,50.823],[4.459,50.84],[4.453,50.848],[4.447,50.853],[4.432,50.86],[4.424,50.861],[4.423,50.866],[4.425,50.873],[4.435,50.877],[4.436,50.879],[4.428,50.888],[4.432,50.893],[4.429,50.896],[4.427,50.903],[4.422,50.91],[4.412,50.909]]]]}},{"type":"Feature","properties":{"name":"West-Vlaanderen","region":"Vlaanderen"},"geometry":{"type":"MultiPolygon","coordinates":[[[[2.939,50.772],[2.867,50.757],[2.869,50.733],[2.87,50.703],[2.782,50.748],[2.739,50.781],[2.682,50.814],[2.625,50.836],[2.599,50.853],[2.605,50.906],[2.63,50.946],[2.58,51.003],[2.644,51.126],[2.784,51.175],[2.924,51.238],[3.061,51.292],[3.1,51.308],[3.181,51.333],[3.174,51.355],[3.175,51.355],[3.191,51.356],[3.174,51.347],[3.189,51.347],[3.196,51.348],[3.196,51.345],[3.196,51.34],[3.194,51.332],[3.196,51.333],[3.203,51.34],[3.215,51.34],[3.223,51.341],[3.224,51.347],[3.217,51.355],[3.211,51.355],[3.224,51.359],[3.227,51.341],[3.259,51.346],[3.373,51.357],[3.387,51.331],[3.384,51.288],[3.389,51.268],[3.401,51.252],[3.385,51.229],[3.386,51.204],[3.409,51.161],[3.341,51.101],[3.437,51.063],[3.435,51.032],[3.449,50.997],[3.446,50.975],[3.453,50.941],[3.432,50.911],[3.462,50.908],[3.469,50.861],[3.512,50.811],[3.494,50.785],[3.422,50.741],[3.366,50.712],[3.305,50.752],[3.235,50.76],[3.162,50.772],[3.103,50.781],[3.041,50.776],[2.98,50.8],[2.939,50.772]]],[[[3.366,51.367],[3.368,51.367],[3.369,51.367],[3.373,51.364],[3.374,51.36],[3.362,51.368],[3.366,51.368],[3.366,51.367]]]]}},{"type":"Feature","properties":{"name":"BrabantWallon","region":"Wallonie"},"geometry":{"type":"MultiPolygon","coordinates":[[[[4.545,50.533],[4.512,50.526],[4.499,50.536],[4.474,50.535],[4.445,50.558],[4.377,50.558],[4.345,50.554],[4.312,50.57],[4.26,50.594],[4.258,50.602],[4.232,50.617],[4.21,50.63],[4.213,50.647],[4.181,50.658],[4.153,50.63],[4.127,50.625],[4.106,50.633],[4.089,50.665],[4.094,50.686],[4.098,50.7],[4.126,50.721],[4.173,50.706],[4.235,50.691],[4.273,50.698],[4.316,50.712],[4.331,50.723],[4.344,50.724],[4.37,50.714],[4.375,50.728],[4.421,50.734],[4.443,50.738],[4.461,50.75],[4.485,50.753],[4.495,50.729],[4.522,50.73],[4.572,50.742],[4.58,50.756],[4.593,50.758],[4.643,50.749],[4.65,50.755],[4.642,50.776],[4.644,50.791],[4.709,50.787],[4.753,50.803],[4.794,50.796],[4.807,50.782],[4.83,50.772],[4.841,50.764],[4.862,50.755],[4.872,50.743],[4.901,50.747],[4.956,50.754],[4.978,50.759],[4.999,50.765],[5.019,50.752],[5.015,50.731],[5.018,50.712],[5.014,50.685],[5.002,50.649],[4.976,50.645],[4.956,50.636],[4.912,50.62],[4.888,50.609],[4.849,50.606],[4.791,50.603],[4.756,50.59],[4.746,50.593],[4.723,50.605],[4.702,50.593],[4.675,50.6],[4.663,50.597],[4.673,50.579],[4.675,50.564],[4.647,50.56],[4.617,50.565],[4.58,50.551],[4.559,50.536],[4.545,50.533]]]]}},{"type":"Feature","properties":{"name":"Hainaut","region":"Wallonie"},"geometry":{"type":"MultiPolygon","coordinates":[[[[4.41,50.053],[4.426,49.982],[4.446,49.937],[4.335,49.963],[4.233,49.958],[4.141,49.979],[4.135,50.015],[4.201,50.057],[4.205,50.105],[4.146,50.129],[4.15,50.177],[4.166,50.215],[4.206,50.273],[4.152,50.277],[4.134,50.274],[4.099,50.312],[4.025,50.358],[3.967,50.341],[3.886,50.327],[3.84,50.354],[3.806,50.355],[3.743,50.348],[3.727,50.311],[3.685,50.328],[3.658,50.371],[3.661,50.458],[3.583,50.491],[3.498,50.498],[3.506,50.528],[3.439,50.507],[3.36,50.504],[3.282,50.553],[3.276,50.582],[3.259,50.628],[3.244,50.67],[3.248,50.709],[3.188,50.74],[3.235,50.76],[3.313,50.741],[3.388,50.727],[3.467,50.767],[3.559,50.753],[3.662,50.734],[3.742,50.767],[3.831,50.738],[3.881,50.726],[4.026,50.691],[4.094,50.694],[4.106,50.633],[4.16,50.644],[4.21,50.63],[4.258,50.596],[4.345,50.554],[4.467,50.548],[4.503,50.534],[4.567,50.52],[4.57,50.487],[4.603,50.483],[4.584,50.434],[4.603,50.391],[4.597,50.344],[4.536,50.31],[4.475,50.307],[4.412,50.304],[4.336,50.269],[4.342,50.23],[4.375,50.244],[4.405,50.182],[4.391,50.144],[4.401,50.076],[4.41,50.053]]],[[[2.946,50.791],[2.954,50.797],[2.98,50.8],[3.007,50.805],[3.013,50.8],[3.037,50.772],[3.035,50.77],[3.015,50.774],[3.01,50.768],[2.983,50.757],[2.972,50.75],[2.957,50.753],[2.94,50.745],[2.938,50.743],[2.944,50.734],[2.93,50.725],[2.93,50.712],[2.922,50.703],[2.912,50.703],[2.91,50.694],[2.9,50.693],[2.884,50.706],[2.871,50.703],[2.873,50.711],[2.874,50.711],[2.872,50.729],[2.865,50.735],[2.854,50.74],[2.852,50.744],[2.852,50.747],[2.858,50.753],[2.867,50.757],[2.901,50.753],[2.918,50.758],[2.939,50.772],[2.942,50.784],[2.946,50.791]]]]}},{"type":"Feature","properties":{"name":"Liège","region":"Wallonie"},"geometry":{"type":"MultiPolygon","coordinates":[[[[6.169,50.225],[6.186,50.196],[6.178,50.18],[6.147,50.178],[6.133,50.156],[6.147,50.136],[6.077,50.158],[6.023,50.205],[6.016,50.309],[5.883,50.34],[5.863,50.29],[5.858,50.263],[5.754,50.292],[5.718,50.333],[5.601,50.394],[5.493,50.411],[5.43,50.403],[5.315,50.363],[5.234,50.42],[5.188,50.469],[5.104,50.517],[5.056,50.555],[4.991,50.641],[5.015,50.731],[5.064,50.714],[5.155,50.692],[5.247,50.717],[5.395,50.745],[5.454,50.715],[5.552,50.762],[5.701,50.805],[5.739,50.745],[5.887,50.712],[6.012,50.757],[6.045,50.728],[6.119,50.72],[6.144,50.689],[6.162,50.671],[6.167,50.644],[6.187,50.63],[6.267,50.627],[6.242,50.593],[6.205,50.571],[6.178,50.542],[6.205,50.521],[6.22,50.505],[6.252,50.504],[6.285,50.499],[6.342,50.483],[6.35,50.457],[6.367,50.419],[6.361,50.371],[6.381,50.353],[6.405,50.323],[6.37,50.313],[6.34,50.316],[6.333,50.321],[6.306,50.32],[6.296,50.309],[6.293,50.297],[6.292,50.279],[6.236,50.263],[6.212,50.253],[6.176,50.236],[6.169,50.225]]]]}},{"type":"Feature","properties":{"name":"Luxembourg","region":"Wallonie"},"geometry":{"type":"MultiPolygon","coordinates":[[[[5.874,49.582],[5.815,49.545],[5.757,49.543],[5.689,49.546],[5.633,49.54],[5.594,49.521],[5.501,49.507],[5.447,49.518],[5.454,49.566],[5.347,49.631],[5.333,49.654],[5.268,49.696],[5.2,49.692],[5.152,49.718],[5.09,49.765],[4.992,49.8],[4.979,49.807],[4.994,49.849],[5.054,49.892],[5.106,49.933],[5.075,49.971],[5.021,49.979],[5.0,50.031],[5.06,50.07],[5.083,50.123],[5.14,50.093],[5.271,50.111],[5.289,50.144],[5.254,50.196],[5.212,50.221],[5.316,50.24],[5.428,50.307],[5.349,50.313],[5.395,50.343],[5.42,50.392],[5.43,50.426],[5.524,50.411],[5.601,50.394],[5.688,50.359],[5.72,50.304],[5.734,50.269],[5.829,50.261],[5.887,50.284],[5.871,50.308],[5.893,50.34],[6.012,50.311],[6.016,50.263],[6.028,50.178],[5.902,50.11],[5.864,50.068],[5.828,50.013],[5.837,49.975],[5.792,49.96],[5.772,49.932],[5.745,49.898],[5.775,49.869],[5.753,49.854],[5.752,49.824],[5.782,49.796],[5.861,49.728],[5.872,49.691],[5.907,49.639],[5.87,49.614],[5.874,49.587],[5.874,49.582]]]]}},{"type":"Feature","properties":{"name":"Namur","region":"Wallonie"},"geometry":{"type":"MultiPolygon","coordinates":[[[[4.989,49.815],[4.956,49.8],[4.921,49.788],[4.862,49.789],[4.855,49.849],[4.879,49.922],[4.796,49.982],[4.837,50.046],[4.839,50.07],[4.86,50.098],[4.878,50.128],[4.832,50.155],[4.756,50.122],[4.703,50.096],[4.687,50.028],[4.633,49.987],[4.541,49.968],[4.45,49.961],[4.422,50.019],[4.401,50.096],[4.381,50.15],[4.405,50.182],[4.375,50.244],[4.315,50.239],[4.32,50.262],[4.406,50.294],[4.47,50.303],[4.525,50.311],[4.601,50.335],[4.605,50.378],[4.614,50.431],[4.601,50.475],[4.575,50.487],[4.583,50.537],[4.647,50.56],[4.662,50.593],[4.702,50.593],[4.75,50.591],[4.849,50.606],[4.949,50.626],[4.99,50.627],[5.046,50.563],[5.07,50.514],[5.115,50.504],[5.188,50.469],[5.236,50.441],[5.275,50.397],[5.322,50.365],[5.408,50.36],[5.378,50.325],[5.36,50.305],[5.42,50.295],[5.286,50.24],[5.211,50.215],[5.258,50.185],[5.288,50.139],[5.271,50.101],[5.133,50.094],[5.068,50.12],[5.056,50.062],[4.986,50.024],[5.026,49.974],[5.085,49.96],[5.106,49.933],[5.047,49.872],[4.983,49.838],[4.989,49.815]]]]}}]};
+    let passportOpen = false;
+    let _journeyTl = null;
+    let _journeyPulseRaf = null;
+
+    function stopJourneyPulse() {
+      if (_journeyPulseRaf) {
+        cancelAnimationFrame(_journeyPulseRaf);
+        _journeyPulseRaf = null;
+      }
+    }
+
+    function geoToCanvas(lat, lng, cw, ch) {
+      const pad = 60;
+      const w = cw - pad * 2, h = ch - pad * 2;
+      return {
+        x: pad + ((lng - GEO_BOUNDS.minLng) / (GEO_BOUNDS.maxLng - GEO_BOUNDS.minLng)) * w,
+        y: pad + ((GEO_BOUNDS.maxLat - lat) / (GEO_BOUNDS.maxLat - GEO_BOUNDS.minLat)) * h
+      };
+    }
+
+    // Region mapping for provinces
+    const PROVINCE_REGION_MAP = {
+      'Bruxelles': 'brussels',
+      'Antwerpen': 'flanders', 'Limburg': 'flanders',
+      'Oost-Vlaanderen': 'flanders', 'VlaamsBrabant': 'flanders', 'West-Vlaanderen': 'flanders',
+      'BrabantWallon': 'wallonia', 'Hainaut': 'wallonia',
+      'Liège': 'wallonia', 'Luxembourg': 'wallonia', 'Namur': 'wallonia'
+    };
+
+    const JOURNEY_REGION_LABELS = {
+      flanders: { text: 'NORTHERN FRAMES', lat: 51.18, lng: 4.15 },
+      brussels: { text: 'CAPITAL SCENES', lat: 50.845, lng: 4.36 },
+      wallonia: { text: 'SOUTHERN STORIES', lat: 50.18, lng: 4.90 }
+    };
+
+    function getCheckedRegionStats(locations) {
+      const stats = { flanders: 0, brussels: 0, wallonia: 0 };
+      locations.forEach(loc => {
+        if (!loc.checkedIn) return;
+        const region = inferRegionFromLocation(loc);
+        if (region && stats[region] !== undefined) stats[region] += 1;
+      });
+      return stats;
+    }
+
+    function drawSpacedCanvasText(ctx, text, x, y, letterSpacing) {
+      const chars = String(text).split('');
+      const widths = chars.map(ch => ctx.measureText(ch).width);
+      const totalWidth = widths.reduce((sum, width) => sum + width, 0) + letterSpacing * Math.max(0, chars.length - 1);
+      const prevAlign = ctx.textAlign;
+      ctx.textAlign = 'left';
+      let cursor = x - totalWidth / 2;
+      chars.forEach((ch, idx) => {
+        ctx.fillText(ch, cursor, y);
+        cursor += widths[idx] + letterSpacing;
+      });
+      ctx.textAlign = prevAlign;
+    }
+
+    function drawJourneyRegionLabels(ctx, cw, ch, regionStats, pulse) {
+      Object.entries(JOURNEY_REGION_LABELS).forEach(([regionKey, label]) => {
+        const count = regionStats[regionKey] || 0;
+        const active = count > 0;
+        const pos = geoToCanvas(label.lat, label.lng, cw, ch);
+        const alpha = active
+          ? Math.min((0.48 + Math.min(count * 0.08, 0.26)) * pulse, 0.88)
+          : 0.16;
+
+        ctx.save();
+        ctx.font = '600 10px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = active
+          ? `rgba(227,176,75,${alpha})`
+          : 'rgba(255,255,255,0.16)';
+        if (active) {
+          ctx.shadowColor = 'rgba(227,176,75,0.35)';
+          ctx.shadowBlur = 14;
+        }
+        drawSpacedCanvasText(ctx, label.text, pos.x, pos.y, 3);
+
+        if (active) {
+          ctx.font = '500 8px Inter, sans-serif';
+          ctx.fillStyle = `rgba(240,237,232,${0.20 + Math.min(count * 0.04, 0.18)})`;
+          ctx.shadowBlur = 0;
+          ctx.fillText(`${count} STAMP${count > 1 ? 'S' : ''}`, pos.x, pos.y + 15);
+        }
+        ctx.restore();
+      });
+    }
+
+    // Neighbor border segments
+    const NEIGHBOR_BORDERS = {
+      'NL': [[51.37,3.36],[51.46,3.85],[51.45,4.29],[51.49,4.50],[51.35,4.89],[51.47,5.04],[51.43,5.25],[51.27,5.23],[51.17,5.49],[51.06,5.87]],
+      'DE': [[51.06,5.87],[50.98,5.75],[50.91,5.96],[50.83,6.00],[50.72,6.02],[50.63,6.24],[50.52,6.34],[50.37,6.19],[50.28,5.82],[50.09,5.81],[49.97,5.47]],
+      'LU': [[49.97,5.47],[49.82,5.52],[49.72,5.40],[49.55,5.33],[49.50,4.87]],
+      'FR': [[49.50,4.87],[49.56,4.82],[49.53,4.44],[49.56,4.24],[49.66,3.98],[49.85,4.05],[50.07,3.70],[50.09,3.42],[50.13,3.18],[50.34,3.11],[50.52,2.81],[50.73,2.55]]
+    };
+
+    // No fetch needed — data is inlined above
+
+    // Draw a GeoJSON polygon/multipolygon path onto current ctx path
+    function traceGeoShape(ctx, geometry, cw, ch) {
+      const coords = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
+      ctx.beginPath();
+      coords.forEach(poly => {
+        poly.forEach(ring => {
+          ring.forEach((pt, i) => {
+            const p = geoToCanvas(pt[1], pt[0], cw, ch); // GeoJSON is [lng, lat]
+            if (i === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+          });
+          ctx.closePath();
+        });
+      });
+    }
+
+    function renderJourney() {
+      const canvas = document.getElementById('journeyCanvas');
+      const checkedLocs = LOCATIONS
+        .filter(l => l.checkedIn)
+        .sort((a, b) => parseCheckInDate(a.checkInDate) - parseCheckInDate(b.checkInDate));
+
+      if (_journeyTl) { _journeyTl.kill(); _journeyTl = null; }
+      stopJourneyPulse();
+
+      const container = canvas.parentElement;
+      const dpr = window.devicePixelRatio || 1;
+      const cw = container.clientWidth;
+      const ch = container.clientHeight;
+      canvas.width = cw * dpr;
+      canvas.height = ch * dpr;
+      canvas.style.width = cw + 'px';
+      canvas.style.height = ch + 'px';
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+
+      const regionStats = getCheckedRegionStats(LOCATIONS);
+
+      // Deduplicate positions by city
+      const seenCities = new Set();
+      const positions = [];
+      checkedLocs.forEach(loc => {
+        if (!seenCities.has(loc.city)) {
+          seenCities.add(loc.city);
+          positions.push({ ...geoToCanvas(loc.lat, loc.lng, cw, ch), loc });
+        }
+      });
+
+      // Use inlined GeoJSON
+      const geoData = _provincesGeoJSON;
+
+      const state = { dotProgress: 0, lineProgress: 0, glow: 0 };
+
+      function draw() {
+        const dp = window.devicePixelRatio || 1;
+        ctx.save();
+        ctx.setTransform(dp, 0, 0, dp, 0, 0);
+
+        // ── Background gradient ──
+        const bgGrad = ctx.createLinearGradient(0, 0, cw, ch);
+        bgGrad.addColorStop(0, '#0A0A0B');
+        bgGrad.addColorStop(0.5, '#0D0D10');
+        bgGrad.addColorStop(1, '#0A0A0B');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, cw, ch);
+
+        // Film grain noise (seeded random pattern)
+        ctx.globalAlpha = 0.012;
+        for (let i = 0; i < 800; i++) {
+          const nx = (Math.sin(i * 127.1 + 311.7) * 43758.5453) % 1 * cw;
+          const ny = (Math.sin(i * 269.5 + 183.3) * 43758.5453) % 1 * ch;
+          ctx.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#C8902A';
+          ctx.fillRect(Math.abs(nx), Math.abs(ny), 1, 1);
+        }
+        ctx.globalAlpha = 1;
+
+        // ── Lat/Lng grid (very fine) ──
+        ctx.globalAlpha = 0.015;
+        ctx.strokeStyle = '#888075';
+        ctx.lineWidth = 0.2;
+        // Longitude lines
+        for (let lng = 2.5; lng <= 6.5; lng += 0.5) {
+          ctx.beginPath();
+          const top = geoToCanvas(GEO_BOUNDS.maxLat, lng, cw, ch);
+          const bot = geoToCanvas(GEO_BOUNDS.minLat, lng, cw, ch);
+          ctx.moveTo(top.x, top.y); ctx.lineTo(bot.x, bot.y); ctx.stroke();
+        }
+        // Latitude lines
+        for (let lat = 49.5; lat <= 51.5; lat += 0.5) {
+          ctx.beginPath();
+          const left = geoToCanvas(lat, GEO_BOUNDS.minLng, cw, ch);
+          const right = geoToCanvas(lat, GEO_BOUNDS.maxLng, cw, ch);
+          ctx.moveTo(left.x, left.y); ctx.lineTo(right.x, right.y); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+
+        // ── Neighbor country outlines ──
+        ctx.save();
+        ctx.globalAlpha = 0.04;
+        ctx.strokeStyle = '#888075';
+        ctx.lineWidth = 0.5;
+        ctx.setLineDash([6, 8]);
+        Object.values(NEIGHBOR_BORDERS).forEach(border => {
+          ctx.beginPath();
+          border.forEach((pt, i) => {
+            const p = geoToCanvas(pt[0], pt[1], cw, ch);
+            if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+          });
+          ctx.stroke();
+        });
+        ctx.setLineDash([]);
+        ctx.restore();
+
+        // ── Real GeoJSON provinces ──
+        if (geoData) {
+          geoData.features.forEach(feature => {
+            const provName = feature.properties.name;
+            const region = PROVINCE_REGION_MAP[provName] || normalizeRegionKey(feature.properties.region) || 'wallonia';
+            const regionCount = regionStats[region] || 0;
+            const isUnlocked = regionCount > 0;
+            const pulse = 0.94 + 0.06 * Math.sin(performance.now() / 900);
+
+            ctx.save();
+            traceGeoShape(ctx, feature.geometry, cw, ch);
+
+            // Region activation fill:
+            // 1) static amber wash after the first check-in,
+            // 2) stronger brightness for repeated check-ins in the same region,
+            // 3) restrained breathing pulse so the unlocked region feels alive.
+            if (isUnlocked) {
+              const baseAlpha = 0.10;
+              const bonusAlpha = Math.min(regionCount * 0.05, 0.16);
+              const fillAlpha = Math.min((baseAlpha + bonusAlpha) * pulse * (0.70 + state.glow * 0.30), 0.30);
+              const strokeAlpha = Math.min(0.24 + regionCount * 0.08, 0.55);
+              const glowBlur = 14 + Math.min(regionCount * 4, 14);
+
+              ctx.fillStyle = `rgba(227,176,75,${fillAlpha})`;
+              ctx.fill();
+
+              ctx.shadowColor = 'rgba(227,176,75,0.38)';
+              ctx.shadowBlur = glowBlur;
+              ctx.strokeStyle = `rgba(227,176,75,${strokeAlpha * 0.35})`;
+              ctx.lineWidth = 5;
+              ctx.stroke();
+              ctx.shadowBlur = 0;
+            } else {
+              ctx.fillStyle = 'rgba(255,255,255,0.018)';
+              ctx.fill();
+            }
+
+            // Province border. Unlocked regions keep their province texture, but the
+            // border becomes less dominant than the larger region glow.
+            ctx.setLineDash([3, 5]);
+            ctx.strokeStyle = isUnlocked
+              ? `rgba(227,176,75,${0.16 + Math.min(regionCount * 0.04, 0.16)})`
+              : 'rgba(60,58,55,0.12)';
+            ctx.lineWidth = isUnlocked ? 0.5 : 0.4;
+            ctx.shadowBlur = 0;
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.restore();
+          });
+        }
+
+        drawJourneyRegionLabels(ctx, cw, ch, regionStats, 0.94 + 0.06 * Math.sin(performance.now() / 900));
+
+        // ── Dim unchecked markers ──
+        LOCATIONS.filter(l => !l.checkedIn).forEach(loc => {
+          const p = geoToCanvas(loc.lat, loc.lng, cw, ch);
+          ctx.save(); ctx.globalAlpha = 0.04;
+          ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+          ctx.fillStyle = '#5A5550'; ctx.fill();
+          ctx.restore();
+        });
+
+        // ── Neon connection lines (3-layer + bezier) ──
+        const vLines = Math.floor(state.lineProgress);
+        const lFrac = state.lineProgress - vLines;
+
+        for (let i = 0; i < Math.min(vLines + 1, positions.length - 1); i++) {
+          const p1 = positions[i], p2 = positions[i + 1];
+          const prog = i < vLines ? 1 : lFrac;
+          if (prog <= 0) continue;
+
+          const dx = p2.x - p1.x, dy = p2.y - p1.y;
+          const cx = (p1.x + p2.x) / 2 - dy * 0.22;
+          const cy = (p1.y + p2.y) / 2 + dx * 0.22;
+
+          // Layer 1: diffuse glow (3px)
+          ctx.save(); ctx.globalAlpha = 0.1 * (0.5 + state.glow * 0.5);
+          ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
+          _partialBez(ctx, p1.x, p1.y, cx, cy, p2.x, p2.y, prog);
+          ctx.strokeStyle = '#C8902A'; ctx.lineWidth = 8;
+          ctx.shadowColor = '#C8902A'; ctx.shadowBlur = 35;
+          ctx.stroke(); ctx.restore();
+
+          // Layer 2: core (1.5px)
+          ctx.save(); ctx.globalAlpha = 0.5 + state.glow * 0.3;
+          ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
+          _partialBez(ctx, p1.x, p1.y, cx, cy, p2.x, p2.y, prog);
+          const lg = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
+          lg.addColorStop(0, 'rgba(227,176,75,0.15)');
+          lg.addColorStop(0.35, 'rgba(227,176,75,0.85)');
+          lg.addColorStop(0.65, 'rgba(227,176,75,0.85)');
+          lg.addColorStop(1, 'rgba(227,176,75,0.15)');
+          ctx.strokeStyle = lg; ctx.lineWidth = 1.5;
+          ctx.shadowColor = '#E3B04B'; ctx.shadowBlur = 8;
+          ctx.stroke(); ctx.restore();
+
+          // Layer 3: white hot center (0.5px)
+          ctx.save(); ctx.globalAlpha = 0.35 + state.glow * 0.25;
+          ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
+          _partialBez(ctx, p1.x, p1.y, cx, cy, p2.x, p2.y, prog);
+          ctx.strokeStyle = 'rgba(255,255,240,0.7)'; ctx.lineWidth = 0.5;
+          ctx.stroke(); ctx.restore();
+        }
+
+        // ── Neon dots ──
+        const vDots = Math.floor(state.dotProgress);
+        const dFrac = state.dotProgress - vDots;
+
+        for (let i = 0; i < Math.min(vDots + 1, positions.length); i++) {
+          const p = positions[i];
+          const s = i < vDots ? 1 : dFrac;
+          if (s <= 0) continue;
+          const r = 4.5 * s;
+          const gr = 20 * s * (0.7 + state.glow * 0.3);
+
+          // Halo
+          ctx.save();
+          const h = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, gr);
+          h.addColorStop(0, 'rgba(227,176,75,0.3)');
+          h.addColorStop(0.35, 'rgba(227,176,75,0.06)');
+          h.addColorStop(1, 'rgba(227,176,75,0)');
+          ctx.fillStyle = h;
+          ctx.beginPath(); ctx.arc(p.x, p.y, gr, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+
+          // Dot
+          ctx.save();
+          ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+          ctx.fillStyle = '#E3B04B';
+          ctx.shadowColor = '#E3B04B'; ctx.shadowBlur = 14; ctx.fill();
+          ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.3, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fill();
+          ctx.restore();
+        }
+
+        ctx.restore();
+      }
+
+      // Labels — only shown after animation, appear on hover
+      function createLabels() {
+        // The bottom timeline already carries exact city/location details. Keeping
+        // DOM city labels off the canvas prevents text overlap, especially for
+        // multiple check-ins in the same city such as Bruges.
+        document.getElementById('journeyView').querySelectorAll('.neon-city-label').forEach(el => el.remove());
+      }
+
+      function showLabels() {
+        // Intentionally no-op; region labels are drawn directly on the canvas.
+      }
+
+      function startRegionPulse() {
+        stopJourneyPulse();
+        const tick = () => {
+          if (!document.getElementById('journeyView').classList.contains('active')) {
+            _journeyPulseRaf = null;
+            return;
+          }
+          draw();
+          _journeyPulseRaf = requestAnimationFrame(tick);
+        };
+        _journeyPulseRaf = requestAnimationFrame(tick);
+      }
+
+      draw();
+      createLabels();
+
+      if (typeof gsap !== 'undefined' && positions.length > 0) {
+        _journeyTl = gsap.timeline({
+          onComplete: () => { draw(); showLabels(); startRegionPulse(); }
+        });
+
+        _journeyTl.to(state, {
+          dotProgress: positions.length,
+          duration: positions.length * 0.3,
+          ease: 'power2.out',
+          onUpdate: draw
+        });
+
+        if (positions.length >= 2) {
+          _journeyTl.to(state, {
+            lineProgress: positions.length - 1,
+            duration: (positions.length - 1) * 0.4,
+            ease: 'power1.inOut',
+            onUpdate: draw
+          }, '-=0.1');
+        }
+
+        _journeyTl.to(state, {
+          glow: 0.8,
+          duration: 0.4,
+          ease: 'power2.out',
+          onUpdate: draw
+        });
+      } else {
+        state.dotProgress = positions.length;
+        state.lineProgress = Math.max(0, positions.length - 1);
+        state.glow = 0.7;
+        draw();
+        showLabels();
+        startRegionPulse();
+      }
+
+      renderBottomTimeline(checkedLocs);
+      updateJourneyEmptyState(checkedLocs);
+    }
+
+    function _partialBez(ctx, x0, y0, cx, cy, x1, y1, t) {
+      if (t >= 1) { ctx.quadraticCurveTo(cx, cy, x1, y1); return; }
+      const qx0 = x0 + (cx - x0) * t, qy0 = y0 + (cy - y0) * t;
+      const qx1 = cx + (x1 - cx) * t, qy1 = cy + (y1 - cy) * t;
+      ctx.quadraticCurveTo(qx0, qy0, qx0 + (qx1 - qx0) * t, qy0 + (qy1 - qy0) * t);
+    }
+
+    function parseCheckInDate(dateStr) {
+      if (!dateStr) return 0;
+      const parsed = new Date(dateStr);
+      return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+    }
+
+    function formatJourneyDate(dateStr) {
+      if (!dateStr) return '';
+      const parsed = new Date(dateStr);
+      if (Number.isNaN(parsed.getTime())) return dateStr;
+      return parsed.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      }).toUpperCase();
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function renderBottomTimeline(checkedLocs) {
+      const timeline = document.getElementById('journeyBottomTimeline');
+      if (!timeline) return;
+
+      if (!checkedLocs || checkedLocs.length === 0) {
+        timeline.className = 'journey-bottom-timeline empty';
+        timeline.innerHTML = `
+          <div class="timeline-empty-state">
+            <div class="timeline-empty-title">THE REEL IS EMPTY</div>
+            <div class="timeline-empty-sub">Your first location stamp will start the story.</div>
+            <button class="timeline-share-btn" type="button" onclick="window.CINE.openShare()">
+              <i class="fa-solid fa-share-nodes"></i> Share My Journey
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      const sortedLocs = [...checkedLocs].sort((a, b) => parseCheckInDate(a.checkInDate) - parseCheckInDate(b.checkInDate));
+      timeline.className = 'journey-bottom-timeline';
+      timeline.innerHTML = `
+        <div class="timeline-title-row">
+          <div class="timeline-title">Check-in Timeline</div>
+          <div class="timeline-actions">
+            <div class="timeline-count">${sortedLocs.length} stamped location${sortedLocs.length > 1 ? 's' : ''}</div>
+            <button class="timeline-share-btn" type="button" onclick="window.CINE.openShare()">
+              <i class="fa-solid fa-share-nodes"></i> Share My Journey
+            </button>
+          </div>
+        </div>
+        <div class="timeline-track">
+          ${sortedLocs.map(loc => `
+            <div class="timeline-node" data-location-id="${escapeHtml(loc.id)}" title="Open ${escapeHtml(loc.locationName)}">
+              <div class="timeline-dot"></div>
+              <div class="timeline-date">${escapeHtml(formatJourneyDate(loc.checkInDate))}</div>
+              <div class="timeline-film">${escapeHtml(loc.filmTitle)}</div>
+              <div class="timeline-location">${escapeHtml(loc.locationName)}</div>
+              <div class="timeline-city">${escapeHtml(loc.city)}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      timeline.querySelectorAll('.timeline-node').forEach(node => {
+        node.addEventListener('click', () => {
+          const loc = LOCATIONS.find(item => item.id === node.dataset.locationId);
+          if (loc) openTimelineLocation(loc);
+        });
+      });
+    }
+
+    function updateJourneyEmptyState(checkedLocs) {
+      const emptyHero = document.getElementById('journeyEmptyHero');
+      if (!emptyHero) return;
+
+      if (!checkedLocs || checkedLocs.length === 0) {
+        emptyHero.classList.add('visible');
+      } else {
+        emptyHero.classList.remove('visible');
+      }
+    }
+
+    function openTimelineLocation(loc) {
+      switchTab('map');
+      setTimeout(() => {
+        openPanel(loc);
+        if (map) map.flyTo([loc.lat, loc.lng], 14, { duration: 0.8 });
+      }, 80);
+    }
+
+    // ============ PASSPORT SIDEBAR ============
+    function renderPassportSidebar(sidebar, checkedLocs) {
+      if (checkedLocs.length === 0) {
+        sidebar.innerHTML = `
+          <div class="passport-header">
+            <div class="passport-title">Cine-Passport</div>
+            <div class="passport-subtitle">Your cinematic trail</div>
+          </div>
+          <div class="passport-empty">
+            <div class="passport-empty-icon"><i class="fa-solid fa-film"></i></div>
+            <div class="passport-empty-title">No stamps yet</div>
+            <div class="passport-empty-sub">Visit filming locations on the Map tab and check in to start building your journey.</div>
+          </div>
+        `;
+        return;
+      }
+
+      let html = `
+        <div class="passport-header">
+          <div class="passport-title">Cine-Passport</div>
+          <div class="passport-subtitle">Your cinematic trail</div>
+        </div>
+        <div class="passport-timeline">
+      `;
+
+      checkedLocs.forEach((loc, idx) => {
+        const dateStr = loc.checkInDate || '';
+        const yearMatch = dateStr.match(/\d{4}/);
+        const monthMatch = dateStr.match(/(\w+)\s/);
+        const dayMatch = dateStr.match(/(\w+)\s(\d+)/);
+        const dateLine = monthMatch
+          ? `${monthMatch[1].substring(0,3).toUpperCase()} ${dayMatch ? dayMatch[2] : ''}, ${yearMatch ? yearMatch[0] : ''}`
+          : '';
+        const quiz = TRIVIA_QUESTIONS.find(q => q.locationId === loc.id);
+        const quizAnswered = quiz ? answeredQuizzes.has(quiz.id) : true;
+
+        html += `
+          <div class="passport-entry" data-idx="${idx}">
+            <div class="passport-entry-date">${dateLine}</div>
+            <div class="passport-entry-city">${loc.city}</div>
+            <div class="passport-entry-film">${loc.filmTitle}</div>
+            <div class="passport-entry-loc">${loc.locationName}</div>
+            <div class="passport-entry-coord">${loc.lat.toFixed(4)}N  ${loc.lng.toFixed(4)}E</div>
+            ${loc.userPhoto ? `<div class="passport-entry-photo"><img src="${loc.userPhoto}" alt=""></div>` : ''}
+            ${loc.trivia ? `
+              <div class="passport-trivia">
+                <div class="passport-trivia-label">Film Trivia</div>
+                <div class="passport-trivia-text">${loc.trivia}</div>
+              </div>
+            ` : ''}
+            ${quiz && !quizAnswered ? `
+              <div class="trivia-quiz-widget" id="quiz-${quiz.id}">
+                <div class="trivia-label">Unlock Badge</div>
+                <div class="trivia-quiz-question">${quiz.question}</div>
+                <div class="trivia-quiz-options">
+                  ${quiz.options.map((opt, i) => `
+                    <button class="trivia-quiz-opt" data-quiz="${quiz.id}" data-idx="${i}">${opt}</button>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      });
+
+      html += `</div>`; // close timeline
+
+      // Progress
+      const total = LOCATIONS.length;
+      const done = checkedLocs.length;
+      const pct = Math.round((done / total) * 100);
+      html += `
+        <div class="passport-footer">
+          <div class="passport-progress-label">Film Locations Visited</div>
+          <div class="passport-progress-bar"><div class="passport-progress-fill" style="width:${pct}%"></div></div>
+          <div class="passport-progress-count"><span>${done}</span> / ${total}</div>
+          <div class="passport-badges">
+            ${BADGES.map(b => `
+              <div class="passport-badge ${earnedBadges.has(b.id) ? 'earned' : ''}" title="${b.label}">
+                <i class="fa-solid ${b.icon}"></i>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+
+      sidebar.innerHTML = html;
+
+      // Animate entries in
+      setTimeout(() => {
+        sidebar.querySelectorAll('.passport-entry').forEach((el, i) => {
+          setTimeout(() => el.classList.add('visible'), i * 120);
+        });
+      }, 100);
+
+      // Bind quiz buttons
+      sidebar.querySelectorAll('.trivia-quiz-opt').forEach(btn => {
+        btn.addEventListener('click', handleQuizAnswer);
+      });
+    }
+
+    function togglePassport() {
+      const sidebar = document.getElementById('passportSidebar');
+      const toggle = document.getElementById('passportToggle');
+      if (!sidebar || !toggle) return;
+      passportOpen = !passportOpen;
+      sidebar.classList.toggle('open', passportOpen);
+      toggle.classList.toggle('open', passportOpen);
+    }
+
+    function handleQuizAnswer(e) {
+      const btn = e.target;
+      const quizId = btn.dataset.quiz;
+      const idx = parseInt(btn.dataset.idx);
+      const quiz = TRIVIA_QUESTIONS.find(q => q.id === quizId);
+      if (!quiz) return;
+
+      const widget = document.getElementById(`quiz-${quizId}`);
+      const allBtns = widget.querySelectorAll('.trivia-quiz-opt');
+
+      allBtns.forEach((b, i) => {
+        b.disabled = true;
+        if (i === quiz.correct) b.classList.add('correct');
+        if (i === idx && idx !== quiz.correct) b.classList.add('wrong');
+      });
+
+      if (idx === quiz.correct) {
+        earnedBadges.add(quiz.badge);
+        answeredQuizzes.add(quiz.id);
+        saveState();
+
+        const resultDiv = document.createElement('div');
+        resultDiv.className = 'trivia-quiz-result';
+        resultDiv.innerHTML = `<strong>Correct!</strong> ${quiz.explanation} <br><em>Badge unlocked: ${quiz.badge.replace(/-/g, ' ')}</em>`;
+        widget.appendChild(resultDiv);
+
+        setTimeout(() => renderJourney(), 1500);
+      } else {
+        answeredQuizzes.add(quiz.id);
+        saveState();
+        const resultDiv = document.createElement('div');
+        resultDiv.className = 'trivia-quiz-result';
+        resultDiv.textContent = quiz.explanation;
+        widget.appendChild(resultDiv);
+      }
+    }
+
+    // ============ LEFT FILTER PANEL ============
+    let activeFilter = null; // null | 'film' | 'location'
+    let filterValue = null;  // currently selected film title or city
+
+    function buildDrawer() {
+      const list = document.getElementById('drawerList');
+      const subtitle = document.getElementById('drawerSubtitle');
+
+      // Determine which locations to show
+      let locs = LOCATIONS.filter(isValidLocation);
+      if (activeFilter === 'film' && filterValue) {
+        locs = locs.filter(l => l.filmTitle === filterValue);
+      } else if (activeFilter === 'location' && filterValue) {
+        locs = locs.filter(l => l.city === filterValue);
+      }
+
+      // Sort: by city then location name
+      locs = [...locs].sort((a, b) => {
+        const city = a.city.localeCompare(b.city);
+        return city !== 0 ? city : a.locationName.localeCompare(b.locationName);
+      });
+
+      // Update subtitle with live count
+      const totalShown = locs.length;
+      const filmsShown = new Set(locs.map(l => l.filmTitle)).size;
+      if (!activeFilter || !filterValue) {
+        subtitle.innerHTML = `<span style="color:var(--amber)">${totalShown}</span> locations &middot; <span style="color:var(--amber)">${filmsShown}</span> films`;
+      } else if (activeFilter === 'film' && filterValue) {
+        subtitle.innerHTML = `<span style="color:var(--amber)">${totalShown}</span> location${totalShown !== 1 ? 's' : ''} &middot; ${filterValue}`;
+      } else {
+        subtitle.innerHTML = `<span style="color:var(--amber)">${totalShown}</span> location${totalShown !== 1 ? 's' : ''} in ${filterValue}`;
+      }
+
+      // Update bottom-left button counts
+      const btnLoc = document.getElementById('btnLocCount');
+      const btnFilm = document.getElementById('btnFilmCount');
+      if (btnLoc) btnLoc.textContent = totalShown;
+      if (btnFilm) btnFilm.textContent = filmsShown;
+
+      if (locs.length === 0) {
+        list.innerHTML = `<div class="drawer-empty">No locations match the current filter.</div>`;
+        return;
+      }
+
+      list.innerHTML = '';
+      locs.forEach(loc => {
+        const item = document.createElement('div');
+        item.className = 'drawer-flat-item' + (activeMarkerId === loc.id ? ' active' : '');
+        item.innerHTML = `
+          <div class="drawer-flat-main">
+            <span class="drawer-flat-loc">${loc.locationName}</span>
+            <span class="drawer-flat-city">${loc.city}</span>
+          </div>
+          <div class="drawer-flat-film">${loc.filmTitle}</div>
+        `;
+        item.addEventListener('click', () => {
+          closeDrawer();
+          openPanel(loc);
+        });
+        list.appendChild(item);
+      });
+    }
+
+    function openDrawer() {
+      buildDrawer();
+      document.getElementById('locationsDrawer').classList.add('open');
+    }
+
+    function closeDrawer() {
+      document.getElementById('locationsDrawer').classList.remove('open');
+    }
+
+    function applyMapFilter() {
+      const af = activeFilter;
+      const fv = filterValue;
+
+      // Show/hide markers based on current filter state
+      LOCATIONS.forEach(loc => {
+        const marker = markers[loc.id];
+        if (!marker) return;
+        let visible = true;
+        if (af === 'film' && fv) visible = loc.filmTitle === fv;
+        else if (af === 'location' && fv) visible = loc.city === fv;
+        if (visible) {
+          if (!map.hasLayer(marker)) marker.addTo(map);
+        } else {
+          if (map.hasLayer(marker)) map.removeLayer(marker);
+        }
+      });
+
+      // Zoom map to fit visible markers
+      const visibleLocs = LOCATIONS.filter(loc => {
+        if (!isValidLocation(loc)) return false;
+        if (af === 'film' && fv) return loc.filmTitle === fv;
+        if (af === 'location' && fv) return loc.city === fv;
+        return true;
+      });
+
+      if (visibleLocs.length > 0) {
+        if (visibleLocs.length === 1) {
+          map.flyTo([visibleLocs[0].lat, visibleLocs[0].lng], 14, { duration: 1.0 });
+        } else {
+          const latLngs = visibleLocs.map(l => L.latLng(l.lat, l.lng));
+          const bounds = L.latLngBounds(latLngs);
+          map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 13, duration: 1.0 });
+        }
+      }
+
+      updateStatusBar();
+    }
+
+    let pickerOpenType = null;
+
+    function closeFilterPicker() {
+      document.getElementById('filterPickerDropdown').classList.remove('open');
+      document.getElementById('chipByFilm').classList.remove('open');
+      document.getElementById('chipByLocation').classList.remove('open');
+      pickerOpenType = null;
+    }
+
+    function showFilterPicker(type, chipEl) {
+      const dropdown = document.getElementById('filterPickerDropdown');
+
+      // If same type already open → just close
+      if (pickerOpenType === type && dropdown.classList.contains('open')) {
+        closeFilterPicker();
+        return;
+      }
+
+      pickerOpenType = type;
+
+      // Mark chip as open
+      document.getElementById('chipByFilm').classList.toggle('open', type === 'film');
+      document.getElementById('chipByLocation').classList.toggle('open', type === 'location');
+
+      // Build values
+      let values = [];
+      if (type === 'film') {
+        values = [...new Set(LOCATIONS.map(l => l.filmTitle))].sort();
+      } else {
+        // Use all cities from current LOCATIONS (includes dynamic data)
+        values = [...new Set(LOCATIONS.filter(isValidLocation).map(l => l.city))].sort();
+      }
+
+      // Position below chip
+      const rect = chipEl.getBoundingClientRect();
+      dropdown.style.top = (rect.bottom + 6) + 'px';
+      dropdown.style.left = rect.left + 'px';
+      dropdown.dataset.pickerType = type;
+
+      document.getElementById('filterPickerHeader').textContent = type === 'film' ? 'Select film' : 'Select city';
+
+      const pickerList = document.getElementById('filterPickerList');
+      pickerList.innerHTML = values.map(v => `
+        <div class="filter-picker-item${filterValue === v && activeFilter === type ? ' selected' : ''}" data-val="${v}">
+          <span>${v}</span>
+          <span class="item-check">✓</span>
+        </div>
+      `).join('');
+
+      dropdown.classList.add('open');
+    }
+
+    // Single delegated handler on the picker list — bound once in initEvents
+    function handlePickerItemClick(e) {
+      e.stopPropagation();
+      const item = e.target.closest('.filter-picker-item');
+      if (!item) return;
+
+      const type = document.getElementById('filterPickerDropdown').dataset.pickerType;
+      const val = item.dataset.val;
+
+      if (activeFilter === type && filterValue === val) {
+        // Deselect
+        activeFilter = null;
+        filterValue = null;
+        resetChip('film');
+        resetChip('location');
+      } else {
+        activeFilter = type;
+        filterValue = val;
+        resetChip(type === 'film' ? 'location' : 'film');
+        const chip = document.getElementById(type === 'film' ? 'chipByFilm' : 'chipByLocation');
+        chip.querySelector('.chip-label').textContent = val;
+        chip.classList.add('active');
+      }
+
+      closeFilterPicker();
+      applyMapFilter();
+
+      // Rebuild and show drawer immediately
+      buildDrawer();
+      document.getElementById('locationsDrawer').classList.add('open');
+    }
+
+    function resetChip(type) {
+      const chip = document.getElementById(type === 'film' ? 'chipByFilm' : 'chipByLocation');
+      chip.querySelector('.chip-label').textContent = type === 'film' ? 'By Film' : 'By City';
+      chip.classList.remove('active', 'open');
+    }
+
+    // ============ NAV ============
+    function navigateToLocation(lat, lng) {
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
+    }
+
+
+
+    // ============ SHARE JOURNEY EXPORT ============
+    let selectedShareFormat = 'png';
+
+    function getCheckedLocationsSorted() {
+      return LOCATIONS
+        .filter(loc => loc.checkedIn && isValidLocation(loc))
+        .sort((a, b) => parseCheckInDate(a.checkInDate) - parseCheckInDate(b.checkInDate));
+    }
+
+    function getShareStats(checkedLocs) {
+      const filmCount = new Set(checkedLocs.map(loc => loc.filmTitle).filter(Boolean)).size;
+      const regionStats = getCheckedRegionStats(LOCATIONS);
+      const regionsLit = Object.values(regionStats).filter(count => count > 0).length;
+      return {
+        locations: checkedLocs.length,
+        films: filmCount,
+        regionsLit,
+        stamps: checkedLocs.length,
+        regionStats
+      };
+    }
+
+    function posterGeoToCanvas(lat, lng, x, y, w, h) {
+      return {
+        x: x + ((lng - GEO_BOUNDS.minLng) / (GEO_BOUNDS.maxLng - GEO_BOUNDS.minLng)) * w,
+        y: y + ((GEO_BOUNDS.maxLat - lat) / (GEO_BOUNDS.maxLat - GEO_BOUNDS.minLat)) * h
+      };
+    }
+
+    function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 3) {
+      const words = String(text || '').split(/\s+/).filter(Boolean);
+      const lines = [];
+      let line = '';
+      words.forEach(word => {
+        const test = line ? `${line} ${word}` : word;
+        if (ctx.measureText(test).width > maxWidth && line) {
+          lines.push(line);
+          line = word;
+        } else {
+          line = test;
+        }
+      });
+      if (line) lines.push(line);
+      lines.slice(0, maxLines).forEach((ln, idx) => {
+        let output = ln;
+        if (idx === maxLines - 1 && lines.length > maxLines) output += '…';
+        ctx.fillText(output, x, y + idx * lineHeight);
+      });
+      return Math.min(lines.length, maxLines) * lineHeight;
+    }
+
+    function drawRoundedRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function drawSharePosterFrame(ctx, progress = 1) {
+      const w = ctx.canvas.width;
+      const h = ctx.canvas.height;
+      const checkedLocs = getCheckedLocationsSorted();
+      const stats = getShareStats(checkedLocs);
+      const routeProgress = Math.max(0, Math.min(1, progress));
+      const regionProgress = Math.max(0, Math.min(1, progress * 1.6));
+      const contentProgress = Math.max(0, Math.min(1, (progress - 0.38) / 0.62));
+
+      ctx.clearRect(0, 0, w, h);
+
+      const bg = ctx.createLinearGradient(0, 0, 0, h);
+      bg.addColorStop(0, '#101010');
+      bg.addColorStop(0.52, '#09090A');
+      bg.addColorStop(1, '#13100B');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, w, h);
+
+      // subtle vignette
+      const vignette = ctx.createRadialGradient(w / 2, h * 0.38, 80, w / 2, h * 0.42, h * 0.78);
+      vignette.addColorStop(0, 'rgba(200,144,42,0.10)');
+      vignette.addColorStop(0.55, 'rgba(0,0,0,0.0)');
+      vignette.addColorStop(1, 'rgba(0,0,0,0.62)');
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.save();
+      ctx.globalAlpha = 0.08;
+      ctx.strokeStyle = '#C8902A';
+      ctx.lineWidth = 1;
+      for (let yy = 70; yy < h; yy += 68) {
+        ctx.beginPath(); ctx.moveTo(54, yy); ctx.lineTo(w - 54, yy); ctx.stroke();
+      }
+      ctx.restore();
+
+      // Header
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(200,144,42,0.72)';
+      ctx.font = '500 24px Inter, sans-serif';
+      drawSpacedCanvasText(ctx, 'CINESPOT BELGIUM', w / 2, 94, 7);
+      ctx.fillStyle = '#F0EDE8';
+      ctx.font = '700 64px Playfair Display, Georgia, serif';
+      ctx.fillText('My Cinematic Journey', w / 2, 172);
+      ctx.fillStyle = 'rgba(240,237,232,0.58)';
+      ctx.font = 'italic 28px Playfair Display, Georgia, serif';
+      ctx.fillText('I lit up Belgium one frame at a time.', w / 2, 222);
+
+      // Poster map card
+      const mapX = 110, mapY = 282, mapW = 860, mapH = 470;
+      ctx.save();
+      drawRoundedRect(ctx, mapX, mapY, mapW, mapH, 22);
+      ctx.fillStyle = 'rgba(255,255,255,0.025)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(200,144,42,0.16)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.clip();
+
+      // Region glows as large soft fields. This export uses a stylised region map
+      // rather than precise boundaries, so it stays readable at social-media size.
+      const regionFields = {
+        flanders: { x: mapX + mapW * 0.46, y: mapY + mapH * 0.29, rx: 340, ry: 118, label: 'NORTHERN FRAMES' },
+        brussels: { x: mapX + mapW * 0.50, y: mapY + mapH * 0.47, rx: 92, ry: 54, label: 'CAPITAL SCENES' },
+        wallonia: { x: mapX + mapW * 0.55, y: mapY + mapH * 0.69, rx: 360, ry: 142, label: 'SOUTHERN STORIES' }
+      };
+
+      Object.entries(regionFields).forEach(([key, field]) => {
+        const count = stats.regionStats[key] || 0;
+        const lit = count > 0;
+        const strength = lit ? regionProgress * (0.16 + Math.min(count * 0.045, 0.18)) : 0.035;
+        const g = ctx.createRadialGradient(field.x, field.y, 0, field.x, field.y, Math.max(field.rx, field.ry));
+        g.addColorStop(0, lit ? `rgba(200,144,42,${strength})` : 'rgba(255,255,255,0.025)');
+        g.addColorStop(0.72, lit ? `rgba(200,144,42,${strength * 0.24})` : 'rgba(255,255,255,0.008)');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.ellipse(field.x, field.y, field.rx, field.ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = lit ? `rgba(200,144,42,${0.48 * regionProgress})` : 'rgba(255,255,255,0.13)';
+        ctx.font = '600 18px Inter, sans-serif';
+        drawSpacedCanvasText(ctx, field.label, field.x, field.y + 6, 3.2);
+        if (lit) {
+          ctx.font = '500 14px Inter, sans-serif';
+          ctx.fillStyle = `rgba(240,237,232,${0.38 * regionProgress})`;
+          ctx.fillText(`${count} stamp${count > 1 ? 's' : ''}`, field.x, field.y + 30);
+        }
+      });
+
+      // Route lines and dots
+      const points = checkedLocs.map(loc => posterGeoToCanvas(Number(loc.lat), Number(loc.lng), mapX + 90, mapY + 46, mapW - 180, mapH - 92));
+      if (points.length > 1) {
+        ctx.save();
+        ctx.strokeStyle = `rgba(227,176,75,${0.72 * routeProgress})`;
+        ctx.lineWidth = 4;
+        ctx.shadowColor = 'rgba(227,176,75,0.45)';
+        ctx.shadowBlur = 18;
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+          const segmentLimit = routeProgress * (points.length - 1);
+          if (i <= Math.floor(segmentLimit)) {
+            ctx.lineTo(points[i].x, points[i].y);
+          } else if (i - 1 <= segmentLimit) {
+            const frac = segmentLimit - (i - 1);
+            const px = points[i - 1].x + (points[i].x - points[i - 1].x) * frac;
+            const py = points[i - 1].y + (points[i].y - points[i - 1].y) * frac;
+            ctx.lineTo(px, py);
+            break;
+          }
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      points.forEach((pt, i) => {
+        const visible = routeProgress * points.length >= i + 0.15;
+        if (!visible) return;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 12, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(227,176,75,0.18)';
+        ctx.shadowColor = '#E3B04B';
+        ctx.shadowBlur = 24;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#E3B04B';
+        ctx.fill();
+        ctx.restore();
+      });
+      ctx.restore();
+
+      // Stats
+      ctx.globalAlpha = Math.max(0.25, contentProgress);
+      const statY = 815;
+      const statW = 200;
+      const statGap = 22;
+      const statX0 = (w - statW * 4 - statGap * 3) / 2;
+      const statItems = [
+        [String(stats.locations).padStart(2, '0'), 'LOCATIONS'],
+        [String(stats.films).padStart(2, '0'), 'FILMS'],
+        [String(stats.regionsLit).padStart(2, '0'), 'REGIONS LIT'],
+        [String(stats.stamps).padStart(2, '0'), 'STAMPS']
+      ];
+      statItems.forEach(([num, label], idx) => {
+        const x = statX0 + idx * (statW + statGap);
+        drawRoundedRect(ctx, x, statY, statW, 128, 16);
+        ctx.fillStyle = 'rgba(255,255,255,0.026)'; ctx.fill();
+        ctx.strokeStyle = 'rgba(200,144,42,0.13)'; ctx.stroke();
+        ctx.fillStyle = '#E3B04B';
+        ctx.font = '700 46px Playfair Display, Georgia, serif';
+        ctx.fillText(num, x + statW / 2, statY + 60);
+        ctx.fillStyle = 'rgba(240,237,232,0.55)';
+        ctx.font = '500 14px Inter, sans-serif';
+        drawSpacedCanvasText(ctx, label, x + statW / 2, statY + 94, 2.2);
+      });
+
+      // Recent highlights
+      ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(200,144,42,0.68)';
+      ctx.font = '500 18px Inter, sans-serif';
+      drawSpacedCanvasText(ctx, 'RECENT HIGHLIGHTS', w / 2, 1014, 4);
+
+      const recent = checkedLocs.slice(-3).reverse();
+      if (recent.length === 0) {
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(240,237,232,0.72)';
+        ctx.font = 'italic 34px Playfair Display, Georgia, serif';
+        ctx.fillText('Every frame begins with a first step.', w / 2, 1080);
+        ctx.fillStyle = 'rgba(240,237,232,0.42)';
+        ctx.font = '22px Inter, sans-serif';
+        ctx.fillText('Check in at a filming location to start your story.', w / 2, 1124);
+      } else {
+        recent.forEach((loc, idx) => {
+          const y = 1060 + idx * 70;
+          ctx.fillStyle = '#F0EDE8';
+          ctx.font = 'italic 28px Playfair Display, Georgia, serif';
+          ctx.fillText(loc.filmTitle || 'Unknown Film', 120, y);
+          ctx.fillStyle = 'rgba(240,237,232,0.48)';
+          ctx.font = '18px Inter, sans-serif';
+          wrapCanvasText(ctx, `${loc.locationName || ''} · ${loc.city || ''} · ${formatJourneyDate(loc.checkInDate)}`, 120, y + 28, 820, 24, 1);
+        });
+      }
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(200,144,42,0.55)';
+      ctx.font = '500 15px Inter, sans-serif';
+      drawSpacedCanvasText(ctx, 'TRACKED WITH CINESPOT BELGIUM', w / 2, h - 70, 3.8);
+      ctx.globalAlpha = 1;
+    }
+
+    function openShareModal() {
+      const modal = document.getElementById('shareModal');
+      if (!modal) return;
+      selectedShareFormat = 'png';
+      document.querySelectorAll('.share-format-card').forEach(card => {
+        card.classList.toggle('active', card.dataset.shareFormat === selectedShareFormat);
+      });
+      updateShareGenerateLabel();
+      modal.classList.add('active');
+      modal.setAttribute('aria-hidden', 'false');
+      setShareStatus('Choose a format, then save your journey card.', '');
+      refreshSharePreview();
+    }
+
+    function closeShareModal() {
+      const modal = document.getElementById('shareModal');
+      if (!modal) return;
+      modal.classList.remove('active');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+
+    function setShareStatus(message, kind = '') {
+      const status = document.getElementById('shareStatus');
+      if (!status) return;
+      status.textContent = message || '';
+      status.className = `share-status ${kind}`.trim();
+    }
+
+    function updateShareGenerateLabel() {
+      const btn = document.getElementById('shareGenerateBtn');
+      if (!btn) return;
+      btn.textContent = selectedShareFormat === 'gif' ? 'Save as GIF' : 'Save as Image';
+    }
+
+    function refreshSharePreview(progress = 1) {
+      const canvas = document.getElementById('sharePreviewCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      drawSharePosterFrame(ctx, progress);
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+
+    function saveSharePng() {
+      const canvas = document.getElementById('sharePreviewCanvas');
+      if (!canvas) return;
+      refreshSharePreview(1);
+      canvas.toBlob(blob => {
+        if (!blob) {
+          setShareStatus('Could not generate the image. Please try again.', 'error');
+          return;
+        }
+        downloadBlob(blob, 'cinespot-belgium-my-journey.png');
+        setShareStatus('Static poster saved as PNG.', 'ready');
+      }, 'image/png');
+    }
+
+    function loadScriptOnce(src, globalName) {
+      return new Promise((resolve, reject) => {
+        if (globalName && window[globalName]) {
+          resolve(window[globalName]);
+          return;
+        }
+        const existing = Array.from(document.scripts).find(script => script.src === src);
+        if (existing) {
+          existing.addEventListener('load', () => resolve(globalName ? window[globalName] : true), { once: true });
+          existing.addEventListener('error', reject, { once: true });
+          return;
+        }
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.onload = () => resolve(globalName ? window[globalName] : true);
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    }
+
+    function createGifWorkerScriptUrl() {
+      // Direct cross-origin Worker(...) calls often fail for local HTML files with origin "null".
+      // Wrapping the official worker in a same-origin Blob URL makes GIF export work in more browsers.
+      const workerCode = "importScripts('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js');";
+      const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
+      return URL.createObjectURL(workerBlob);
+    }
+
+    async function saveShareGif() {
+      if (typeof GIF === 'undefined') {
+        try {
+          setShareStatus('Loading GIF export library…', '');
+          await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js', 'GIF');
+        } catch (err) {
+          setShareStatus('GIF export library could not be loaded. Please check your internet connection or save as PNG.', 'error');
+          return;
+        }
+      }
+
+      setShareStatus('Generating animated GIF…', '');
+      const workCanvas = document.createElement('canvas');
+      workCanvas.width = 540;
+      workCanvas.height = 675;
+      const workCtx = workCanvas.getContext('2d');
+      const renderCanvas = document.createElement('canvas');
+      renderCanvas.width = 1080;
+      renderCanvas.height = 1350;
+      const renderCtx = renderCanvas.getContext('2d');
+
+      const gifWorkerScriptUrl = createGifWorkerScriptUrl();
+      const gif = new GIF({
+        workers: 2,
+        quality: 12,
+        width: workCanvas.width,
+        height: workCanvas.height,
+        workerScript: gifWorkerScriptUrl
+      });
+
+      const totalFrames = 36;
+      for (let i = 0; i < totalFrames; i++) {
+        const progress = i / (totalFrames - 1);
+        const eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+        drawSharePosterFrame(renderCtx, eased);
+        workCtx.clearRect(0, 0, workCanvas.width, workCanvas.height);
+        workCtx.drawImage(renderCanvas, 0, 0, workCanvas.width, workCanvas.height);
+        gif.addFrame(workCtx, { copy: true, delay: i === totalFrames - 1 ? 900 : 90 });
+      }
+
+      gif.on('finished', blob => {
+        downloadBlob(blob, 'cinespot-belgium-my-journey.gif');
+        setShareStatus('Animated journey saved as GIF.', 'ready');
+        setTimeout(() => URL.revokeObjectURL(gifWorkerScriptUrl), 1500);
+      });
+      gif.on('progress', p => {
+        setShareStatus(`Generating animated GIF… ${Math.round(p * 100)}%`, '');
+      });
+      try {
+        gif.render();
+      } catch (err) {
+        console.error('GIF render failed:', err);
+        URL.revokeObjectURL(gifWorkerScriptUrl);
+        setShareStatus('GIF export failed in this browser. Please try opening the file through a local server, or save as PNG.', 'error');
+      }
+    }
+
+    function initShareEvents() {
+      document.getElementById('shareModalClose')?.addEventListener('click', closeShareModal);
+      document.getElementById('shareModal')?.addEventListener('click', (e) => {
+        if (e.target === document.getElementById('shareModal')) closeShareModal();
+      });
+      document.getElementById('shareRefreshPreviewBtn')?.addEventListener('click', () => {
+        refreshSharePreview(selectedShareFormat === 'gif' ? 0.72 : 1);
+        setShareStatus('Preview refreshed with your current check-ins.', 'ready');
+      });
+      document.getElementById('shareGenerateBtn')?.addEventListener('click', () => {
+        if (selectedShareFormat === 'gif') saveShareGif();
+        else saveSharePng();
+      });
+      document.querySelectorAll('.share-format-card').forEach(card => {
+        card.addEventListener('click', () => {
+          selectedShareFormat = card.dataset.shareFormat || 'png';
+          document.querySelectorAll('.share-format-card').forEach(item => item.classList.toggle('active', item === card));
+          updateShareGenerateLabel();
+          refreshSharePreview(selectedShareFormat === 'gif' ? 0.72 : 1);
+          setShareStatus(selectedShareFormat === 'gif' ? 'GIF may take a moment to generate.' : 'PNG is the fastest and clearest option.', '');
+        });
+      });
+    }
+
+    // ============ EVENTS ============
+    function initEvents() {
+      document.getElementById('panelClose').addEventListener('click', closePanel);
+
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+      });
+
+      // Left panel open button
+      document.getElementById('panelOpenBtn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openDrawer();
+      });
+      document.getElementById('drawerClose').addEventListener('click', closeDrawer);
+
+      // Picker item clicks — single delegated handler, bound once
+      document.getElementById('filterPickerList').addEventListener('click', handlePickerItemClick);
+
+      // Filter chips
+      ['chipByFilm', 'chipByLocation'].forEach(id => {
+        const chip = document.getElementById(id);
+        const type = chip.dataset.type;
+        chip.addEventListener('click', (e) => {
+          if (e.target.classList.contains('chip-x')) {
+            e.stopPropagation();
+            activeFilter = null;
+            filterValue = null;
+            resetChip('film');
+            resetChip('location');
+            closeFilterPicker();
+            applyMapFilter();
+            buildDrawer();
+            document.getElementById('locationsDrawer').classList.add('open');
+            return;
+          }
+          showFilterPicker(type, chip);
+        });
+      });
+
+      // Close filter picker on outside click
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#filterPickerDropdown') && !e.target.closest('.nav-filter-chip')) {
+          closeFilterPicker();
+        }
+      });
+
+      document.getElementById('stampOverlay').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('stampOverlay')) closeStamp();
+      });
+      document.getElementById('stampJourneyBtn').addEventListener('click', () => {
+        closeStamp();
+        switchTab('journey');
+      });
+
+      document.getElementById('passportToggle')?.addEventListener('click', togglePassport);
+
+      document.getElementById('journeyEmptyExploreBtn')?.addEventListener('click', () => {
+        switchTab('map');
+      });
+
+      initShareEvents();
+
+      document.getElementById('modalClose').addEventListener('click', closeUpload);
+      document.getElementById('uploadModal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('uploadModal')) closeUpload();
+      });
+
+      document.getElementById('fileInput').addEventListener('change', (e) => {
+        if (e.target.files[0]) handleFileUpload(e.target.files[0]);
+      });
+
+      const dropzone = document.getElementById('dropzone');
+      dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+      dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+      dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+        if (e.dataTransfer.files[0]) handleFileUpload(e.dataTransfer.files[0]);
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { closePanel(); closeStamp(); closeUpload(); closeDrawer(); closeShareModal(); }
+      });
+    }
+
+    // ============ PUBLIC API ============
+    window.CINE = {
+      checkIn,
+      switchTab,
+      navigate: navigateToLocation,
+      openUpload,
+      openShare: openShareModal,
+      openLocation: (locId) => {
+        const loc = LOCATIONS.find(l => l.id === locId);
+        if (loc) openTimelineLocation(loc);
+      },
+    };
+
+    // ============ INIT ============
+    document.addEventListener('DOMContentLoaded', () => {
+      const mapContainer = document.getElementById('mapContainer');
+      const journeyView = document.getElementById('journeyView');
+      const aboutView = document.getElementById('aboutView');
+
+      // Always show the Leaflet map immediately with the local seed dataset.
+      // Dynamic Wikidata/TMDB hydration is allowed to happen afterwards, but it must never block first paint.
+      mapContainer.style.display = 'block';
+      journeyView.classList.remove('active');
+      aboutView.classList.remove('active');
+
+      initEvents();
+      loadState();
+
+      try {
+        initMap();
+        setTimeout(() => { if (map) map.invalidateSize({ animate: false }); }, 120);
+      } catch (e) {
+        console.error('Map init failed:', e);
+      }
+
+      try {
+        initSearch();
+      } catch (e) {
+        console.error('Search init failed:', e);
+      }
+
+      try {
+        buildDrawer(); // initialise bottom-left count button (drawer stays closed)
+      } catch (e) {
+        console.error('Drawer init failed:', e);
+      }
+
+      // Hydrate extra locations after the map is already visible.
+      // When hydration finishes, rebuild markers without hiding the map.
+      hydrateDynamicLocations()
+        .then(() => {
+          rebuildMapMarkers();
+        })
+        .catch(e => {
+          console.warn('Location hydration failed after initial map render:', e);
+          LOCATIONS = [...SEED_LOCATIONS];
+          loadState();
+          rebuildMapMarkers();
+        });
+
+      // Resize canvas on window resize if journey tab is active; otherwise refresh Leaflet size.
+      window.addEventListener('resize', () => {
+        if (journeyView.classList.contains('active')) {
+          renderJourney();
+        } else if (map) {
+          map.invalidateSize({ animate: false });
+        }
+      });
+    });
+
+  })();
+  </script>
+</body>
+</html>
